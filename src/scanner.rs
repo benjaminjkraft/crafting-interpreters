@@ -65,7 +65,7 @@ impl<'a> Scanner<'a> {
             }
             b'/' => {
                 if self.match_(b'/') {
-                    while !self.is_at_end() && self.peek() != b'\n' {
+                    while self.peek().is_some_and(|c| c != b'\n') {
                         self.advance();
                     }
                 } else {
@@ -98,9 +98,12 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    // TODO: here and below, chars instead of u8s?
-    fn peek(&mut self) -> u8 {
-        self.source.as_bytes()[self.current]
+    fn peek(&mut self) -> Option<u8> {
+        if self.is_at_end() {
+            None
+        } else {
+            Some(self.source.as_bytes()[self.current])
+        }
     }
 
     fn peek_next(&mut self) -> Option<u8> {
@@ -112,13 +115,13 @@ impl<'a> Scanner<'a> {
     }
 
     fn advance(&mut self) -> u8 {
-        let ch = self.peek();
+        let ch = self.peek().unwrap();
         self.current += 1;
         ch
     }
 
     fn match_(&mut self, expected: u8) -> bool {
-        if self.is_at_end() || self.peek() != expected {
+        if self.peek() != Some(expected) {
             return false;
         } else {
             self.current += 1;
@@ -140,8 +143,8 @@ impl<'a> Scanner<'a> {
     }
 
     fn string(&mut self) -> Result<(), LoxError> {
-        while !self.is_at_end() && self.peek() != b'"' {
-            if self.peek() == b'\n' {
+        while self.peek() != Some(b'"') {
+            if self.peek() == Some(b'\n') {
                 self.line += 1
             }
             self.advance();
@@ -158,14 +161,13 @@ impl<'a> Scanner<'a> {
     }
 
     fn number(&mut self) {
-        while !self.is_at_end() && is_digit(self.peek()) {
+        while self.peek().is_some_and(is_digit) {
             self.advance();
         }
-        let decimal =
-            !self.is_at_end() && self.peek() == b'.' && self.peek_next().map_or(false, is_digit);
+        let decimal = self.peek() == Some(b'.') && self.peek_next().is_some_and(is_digit);
         if decimal {
             self.advance();
-            while !self.is_at_end() && is_digit(self.peek()) {
+            while self.peek().is_some_and(is_digit) {
                 self.advance();
             }
         }
@@ -178,7 +180,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) {
-        while !self.is_at_end() && is_alpha_numeric(self.peek()) {
+        while self.peek().is_some_and(is_alpha_numeric) {
             self.advance();
         }
 
