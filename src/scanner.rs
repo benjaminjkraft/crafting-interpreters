@@ -68,19 +68,14 @@ impl<'a> Scanner<'a> {
             }
             b'/' => {
                 if self.match_(b'/') {
-                    while self.peek().is_some_and(|c| c != b'\n') {
-                        self.advance();
-                    }
+                    self.advance_all(|c| c != b'\n');
                     None
                 } else {
                     self.token(Slash)
                 }
             }
             b' ' | b'\r' | b'\t' => None,
-            b'\n' => {
-                self.line += 1;
-                None
-            }
+            b'\n' => None,
             b'"' => self.string()?,
             c => {
                 if is_digit(c) {
@@ -120,16 +115,27 @@ impl<'a> Scanner<'a> {
 
     fn advance(&mut self) -> u8 {
         let ch = self.peek().unwrap();
+        if ch == b'\n' {
+            self.line += 1;
+        }
         self.current += 1;
         ch
     }
 
     fn match_(&mut self, expected: u8) -> bool {
-        if self.peek() != Some(expected) {
-            return false;
+        self.match_pred(&|c| c == expected)
+    }
+
+    fn advance_all(&mut self, pred: impl Fn(u8) -> bool) {
+        while self.match_pred(&pred) {}
+    }
+
+    fn match_pred(&mut self, pred: &impl Fn(u8) -> bool) -> bool {
+        if self.peek().is_some_and(pred) {
+            self.advance();
+            true
         } else {
-            self.current += 1;
-            return true;
+            false
         }
     }
 
@@ -147,32 +153,21 @@ impl<'a> Scanner<'a> {
     }
 
     fn string(&mut self) -> Result<Option<Token<'a>>, LoxError> {
-        while self.peek() != Some(b'"') {
-            if self.peek() == Some(b'\n') {
-                self.line += 1
-            }
-            self.advance();
-        }
-
-        if self.is_at_end() {
+        self.advance_all(|c| c != b'"');
+        if !self.match_(b'"') {
             self.err("Unterminated string".to_string())?;
         }
 
-        self.advance(); // close-quote
         let val = &self.source[self.start + 1..self.current - 1];
         Ok(self.token_literal(StringLiteral, Object::String(val.to_string())))
     }
 
     fn number(&mut self) -> Option<Token<'a>> {
-        while self.peek().is_some_and(is_digit) {
-            self.advance();
-        }
+        self.advance_all(is_digit);
         let decimal = self.peek() == Some(b'.') && self.peek_next().is_some_and(is_digit);
         if decimal {
             self.advance();
-            while self.peek().is_some_and(is_digit) {
-                self.advance();
-            }
+            self.advance_all(is_digit);
         }
         let val = &self.source[self.start..self.current];
         if decimal {
@@ -183,9 +178,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) -> Option<Token<'a>> {
-        while self.peek().is_some_and(is_alpha_numeric) {
-            self.advance();
-        }
+        self.advance_all(is_alpha_numeric);
 
         let type_ = KEYWORDS
             .get(&self.source[self.start..self.current])
