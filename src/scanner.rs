@@ -8,89 +8,93 @@ use TokenType::*;
 
 pub struct Scanner<'a> {
     source: &'a str,
-    tokens: Vec<Token<'a>>,
     start: usize,
     current: usize,
     line: usize,
 }
 
 impl<'a> Scanner<'a> {
-    fn scan_tokens(&mut self) -> Result<(), LoxError> {
+    fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, LoxError> {
+        let mut tokens = Vec::new();
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_token()?;
+            match self.scan_token()? {
+                Some(tok) => tokens.push(tok),
+                None => {}
+            }
         }
 
-        self.tokens.push(Token {
+        tokens.push(Token {
             type_: EOF,
             lexeme: "",
             literal: Object::Nil,
             line: self.line,
         });
-        Ok(())
+        Ok(tokens)
     }
 
     fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
 
-    fn scan_token(&mut self) -> Result<(), LoxError> {
+    fn scan_token(&mut self) -> Result<Option<Token<'a>>, LoxError> {
         let c = self.advance();
-        match c {
-            b'(' => self.add_token(LeftParen),
-            b')' => self.add_token(RightParen),
-            b'{' => self.add_token(LeftBrace),
-            b'}' => self.add_token(RightBrace),
-            b',' => self.add_token(Comma),
-            b'.' => self.add_token(Dot),
-            b'-' => self.add_token(Minus),
-            b'+' => self.add_token(Plus),
-            b';' => self.add_token(Semicolon),
-            b'*' => self.add_token(Star),
+        Ok(match c {
+            b'(' => self.token(LeftParen),
+            b')' => self.token(RightParen),
+            b'{' => self.token(LeftBrace),
+            b'}' => self.token(RightBrace),
+            b',' => self.token(Comma),
+            b'.' => self.token(Dot),
+            b'-' => self.token(Minus),
+            b'+' => self.token(Plus),
+            b';' => self.token(Semicolon),
+            b'*' => self.token(Star),
             b'!' => {
                 let next_eq = self.match_(b'=');
-                self.add_token(if next_eq { BangEqual } else { Bang })
+                self.token(if next_eq { BangEqual } else { Bang })
             }
             b'=' => {
                 let next_eq = self.match_(b'=');
-                self.add_token(if next_eq { EqualEqual } else { Equal })
+                self.token(if next_eq { EqualEqual } else { Equal })
             }
             b'<' => {
                 let next_eq = self.match_(b'=');
-                self.add_token(if next_eq { LessEqual } else { Less })
+                self.token(if next_eq { LessEqual } else { Less })
             }
             b'>' => {
                 let next_eq = self.match_(b'=');
-                self.add_token(if next_eq { GreaterEqual } else { Greater })
+                self.token(if next_eq { GreaterEqual } else { Greater })
             }
             b'/' => {
                 if self.match_(b'/') {
                     while self.peek().is_some_and(|c| c != b'\n') {
                         self.advance();
                     }
+                    None
                 } else {
-                    self.add_token(Slash)
+                    self.token(Slash)
                 }
             }
-            b' ' | b'\r' | b'\t' => {}
+            b' ' | b'\r' | b'\t' => None,
             b'\n' => {
                 self.line += 1;
+                None
             }
             b'"' => self.string()?,
             c => {
                 if is_digit(c) {
-                    self.number();
+                    self.number()
                 } else if is_alpha(c) {
-                    self.identifier();
+                    self.identifier()
                 } else {
                     self.err(format!("Unexpected character: '{}'.", c))?
                 }
             }
-        }
-        Ok(())
+        })
     }
 
-    fn err(&mut self, message: String) -> Result<(), LoxError> {
+    fn err(&mut self, message: String) -> Result<Option<Token<'a>>, LoxError> {
         Err(LoxError {
             line: self.line,
             loc: "".to_string(),
@@ -129,12 +133,12 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn add_token(&mut self, type_: TokenType) {
-        self.add_token_literal(type_, Object::Nil)
+    fn token(&self, type_: TokenType) -> Option<Token<'a>> {
+        self.token_literal(type_, Object::Nil)
     }
 
-    fn add_token_literal(&mut self, type_: TokenType, literal: Object) {
-        self.tokens.push(Token {
+    fn token_literal(&self, type_: TokenType, literal: Object) -> Option<Token<'a>> {
+        Some(Token {
             type_,
             lexeme: &self.source[self.start..self.current],
             literal,
@@ -142,7 +146,7 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    fn string(&mut self) -> Result<(), LoxError> {
+    fn string(&mut self) -> Result<Option<Token<'a>>, LoxError> {
         while self.peek() != Some(b'"') {
             if self.peek() == Some(b'\n') {
                 self.line += 1
@@ -156,11 +160,10 @@ impl<'a> Scanner<'a> {
 
         self.advance(); // close-quote
         let val = &self.source[self.start + 1..self.current - 1];
-        self.add_token_literal(StringLiteral, Object::String(val.to_string()));
-        Ok(())
+        Ok(self.token_literal(StringLiteral, Object::String(val.to_string())))
     }
 
-    fn number(&mut self) {
+    fn number(&mut self) -> Option<Token<'a>> {
         while self.peek().is_some_and(is_digit) {
             self.advance();
         }
@@ -173,13 +176,13 @@ impl<'a> Scanner<'a> {
         }
         let val = &self.source[self.start..self.current];
         if decimal {
-            self.add_token_literal(Number, Object::Float(val.parse().unwrap()));
+            self.token_literal(Number, Object::Float(val.parse().unwrap()))
         } else {
-            self.add_token_literal(Number, Object::Int(val.parse().unwrap()));
+            self.token_literal(Number, Object::Int(val.parse().unwrap()))
         }
     }
 
-    fn identifier(&mut self) {
+    fn identifier(&mut self) -> Option<Token<'a>> {
         while self.peek().is_some_and(is_alpha_numeric) {
             self.advance();
         }
@@ -188,7 +191,7 @@ impl<'a> Scanner<'a> {
             .get(&self.source[self.start..self.current])
             .copied()
             .unwrap_or(Identifier);
-        self.add_token(type_);
+        self.token(type_)
     }
 }
 
@@ -207,13 +210,11 @@ fn is_alpha_numeric(c: u8) -> bool {
 pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
     let mut scanner = Scanner {
         source,
-        tokens: Vec::new(),
         start: 0,
         current: 0,
         line: 1,
     };
-    scanner.scan_tokens()?;
-    return Ok(scanner.tokens);
+    scanner.scan_tokens()
 }
 
 #[derive(Debug)]
