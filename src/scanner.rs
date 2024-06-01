@@ -4,6 +4,7 @@ use crate::object::Object;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fmt;
+use std::iter;
 use TokenType::*;
 
 pub struct Scanner<'a> {
@@ -11,26 +12,33 @@ pub struct Scanner<'a> {
     start: usize,
     current: usize,
     line: usize,
+    empty: bool,
+}
+
+impl<'a> iter::Iterator for Scanner<'a> {
+    type Item = Result<Token<'a>, LoxError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while !self.empty {
+            match self.scan_token() {
+                Err(err) => return Some(Err(err)),
+                Ok(Some(tok)) => return Some(Ok(tok)),
+                Ok(None) => {}
+            }
+        }
+        return None;
+    }
 }
 
 impl<'a> Scanner<'a> {
-    fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, LoxError> {
-        let mut tokens = Vec::new();
-        while !self.is_at_end() {
-            self.start = self.current;
-            match self.scan_token()? {
-                Some(tok) => tokens.push(tok),
-                None => {}
-            }
+    pub fn new(source: &'a str) -> Self {
+        Scanner {
+            source,
+            start: 0,
+            current: 0,
+            line: 1,
+            empty: false,
         }
-
-        tokens.push(Token {
-            type_: EOF,
-            lexeme: "",
-            literal: Object::Nil,
-            line: self.line,
-        });
-        Ok(tokens)
     }
 
     fn is_at_end(&self) -> bool {
@@ -38,6 +46,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_token(&mut self) -> Result<Option<Token<'a>>, LoxError> {
+        self.start = self.current;
+        if self.is_at_end() {
+            self.empty = true;
+            return Ok(self.token(EOF));
+        }
         let c = self.advance();
         Ok(match c {
             b'(' => self.token(LeftParen),
@@ -200,16 +213,6 @@ fn is_alpha_numeric(c: u8) -> bool {
     return is_digit(c) || is_alpha(c);
 }
 
-pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
-    let mut scanner = Scanner {
-        source,
-        start: 0,
-        current: 0,
-        line: 1,
-    };
-    scanner.scan_tokens()
-}
-
 #[derive(Debug)]
 pub struct Token<'a> {
     type_: TokenType,
@@ -296,19 +299,24 @@ static KEYWORDS: Lazy<HashMap<&str, TokenType>> = Lazy::new(|| {
     m
 });
 
+#[cfg(test)]
+fn scan_to_vec<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
+    Scanner::new(&source).collect()
+}
+
 #[test]
 fn test_scanner() {
-    insta::assert_debug_snapshot!(scan_tokens("(){},.-+;* // (symbols)"));
-    insta::assert_debug_snapshot!(scan_tokens(""));
-    insta::assert_debug_snapshot!(scan_tokens("\n\n"));
-    insta::assert_debug_snapshot!(scan_tokens("// asdf"));
-    insta::assert_debug_snapshot!(scan_tokens("// asdf\n"));
-    insta::assert_debug_snapshot!(scan_tokens("\n\n!a and !!b and !!c != d == e////"));
-    insta::assert_debug_snapshot!(scan_tokens("= == < <= > >= => =<"));
-    insta::assert_debug_snapshot!(scan_tokens("1/1.1/1.23/123.45"));
-    insta::assert_debug_snapshot!(scan_tokens("1"));
-    insta::assert_debug_snapshot!(scan_tokens("\n\n\t\t   \n\t\t   \"asdf!!\"\n\nvar2"));
-    insta::assert_debug_snapshot!(scan_tokens("and class class_ else false for fun"));
-    insta::assert_debug_snapshot!(scan_tokens("if if_ nil null or print return super"));
-    insta::assert_debug_snapshot!(scan_tokens("this true var while class and fun"));
+    insta::assert_debug_snapshot!(scan_to_vec("(){},.-+;* // (symbols)"));
+    insta::assert_debug_snapshot!(scan_to_vec(""));
+    insta::assert_debug_snapshot!(scan_to_vec("\n\n"));
+    insta::assert_debug_snapshot!(scan_to_vec("// asdf"));
+    insta::assert_debug_snapshot!(scan_to_vec("// asdf\n"));
+    insta::assert_debug_snapshot!(scan_to_vec("\n\n!a and !!b and !!c != d == e////"));
+    insta::assert_debug_snapshot!(scan_to_vec("= == < <= > >= => =<"));
+    insta::assert_debug_snapshot!(scan_to_vec("1/1.1/1.23/123.45"));
+    insta::assert_debug_snapshot!(scan_to_vec("1"));
+    insta::assert_debug_snapshot!(scan_to_vec("\n\n\t\t   \n\t\t   \"asdf!!\"\n\nvar2"));
+    insta::assert_debug_snapshot!(scan_to_vec("and class class_ else false for fun"));
+    insta::assert_debug_snapshot!(scan_to_vec("if if_ nil null or print return super"));
+    insta::assert_debug_snapshot!(scan_to_vec("this true var while class and fun"));
 }
