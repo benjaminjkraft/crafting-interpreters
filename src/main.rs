@@ -43,9 +43,9 @@ fn run_prompt() {
 }
 
 fn run(source: String) -> Result<(), LoxError> {
-    let sc = scanner::Scanner::new(&source);
+    let sc = scanner::scan_tokens(&source)?;
     for token in sc {
-        println!("{}", token?)
+        println!("{}", token)
     }
     Ok(())
 }
