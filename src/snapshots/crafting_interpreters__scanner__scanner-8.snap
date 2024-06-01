@@ -1,0 +1,64 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"1/1.1/1.23/123.45\")"
+---
+Ok(
+    [
+        Token {
+            type_: Number,
+            lexeme: "1",
+            literal: Int(
+                1,
+            ),
+            line: 1,
+        },
+        Token {
+            type_: Slash,
+            lexeme: "/",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Number,
+            lexeme: "1.1",
+            literal: Float(
+                1.1,
+            ),
+            line: 1,
+        },
+        Token {
+            type_: Slash,
+            lexeme: "/",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Number,
+            lexeme: "1.23",
+            literal: Float(
+                1.23,
+            ),
+            line: 1,
+        },
+        Token {
+            type_: Slash,
+            lexeme: "/",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Number,
+            lexeme: "123.45",
+            literal: Float(
+                123.45,
+            ),
+            line: 1,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 1,
+        },
+    ],
+)

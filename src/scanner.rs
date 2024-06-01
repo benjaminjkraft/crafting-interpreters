@@ -65,7 +65,7 @@ impl<'a> Scanner<'a> {
             }
             b'/' => {
                 if self.match_(b'/') {
-                    while self.peek() != b'\n' && !self.is_at_end() {
+                    while !self.is_at_end() && self.peek() != b'\n' {
                         self.advance();
                     }
                 } else {
@@ -158,13 +158,14 @@ impl<'a> Scanner<'a> {
     }
 
     fn number(&mut self) {
-        while is_digit(self.peek()) {
+        while !self.is_at_end() && is_digit(self.peek()) {
             self.advance();
         }
-        let decimal = self.peek() == b'.' && self.peek_next().map_or(false, is_digit);
+        let decimal =
+            !self.is_at_end() && self.peek() == b'.' && self.peek_next().map_or(false, is_digit);
         if decimal {
             self.advance();
-            while is_digit(self.peek()) {
+            while !self.is_at_end() && is_digit(self.peek()) {
                 self.advance();
             }
         }
@@ -177,7 +178,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) {
-        while is_alpha_numeric(self.peek()) {
+        while !self.is_at_end() && is_alpha_numeric(self.peek()) {
             self.advance();
         }
 
@@ -213,6 +214,7 @@ pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
     return Ok(scanner.tokens);
 }
 
+#[derive(Debug)]
 pub struct Token<'a> {
     type_: TokenType,
     lexeme: &'a str,
@@ -297,3 +299,20 @@ static KEYWORDS: Lazy<HashMap<&str, TokenType>> = Lazy::new(|| {
     m.insert("while", While);
     m
 });
+
+#[test]
+fn test_scanner() {
+    insta::assert_debug_snapshot!(scan_tokens("(){},.-+;* // (symbols)"));
+    insta::assert_debug_snapshot!(scan_tokens(""));
+    insta::assert_debug_snapshot!(scan_tokens("\n\n"));
+    insta::assert_debug_snapshot!(scan_tokens("// asdf"));
+    insta::assert_debug_snapshot!(scan_tokens("// asdf\n"));
+    insta::assert_debug_snapshot!(scan_tokens("\n\n!a and !!b and !!c != d == e////"));
+    insta::assert_debug_snapshot!(scan_tokens("= == < <= > >= => =<"));
+    insta::assert_debug_snapshot!(scan_tokens("1/1.1/1.23/123.45"));
+    insta::assert_debug_snapshot!(scan_tokens("1"));
+    insta::assert_debug_snapshot!(scan_tokens("\n\n\t\t   \n\t\t   \"asdf!!\"\n\nvar2"));
+    insta::assert_debug_snapshot!(scan_tokens("and class class_ else false for fun"));
+    insta::assert_debug_snapshot!(scan_tokens("if if_ nil null or print return super"));
+    insta::assert_debug_snapshot!(scan_tokens("this true var while class and fun"));
+}

@@ -1,0 +1,56 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"this true var while class and fun\")"
+---
+Ok(
+    [
+        Token {
+            type_: This,
+            lexeme: "this",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: True,
+            lexeme: "true",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Var,
+            lexeme: "var",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: While,
+            lexeme: "while",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Class,
+            lexeme: "class",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: And,
+            lexeme: "and",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Fun,
+            lexeme: "fun",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 1,
+        },
+    ],
+)

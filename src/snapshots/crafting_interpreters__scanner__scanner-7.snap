@@ -1,0 +1,74 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"= == < <= > >= => =<\")"
+---
+Ok(
+    [
+        Token {
+            type_: Equal,
+            lexeme: "=",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: EqualEqual,
+            lexeme: "==",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Less,
+            lexeme: "<",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: LessEqual,
+            lexeme: "<=",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Greater,
+            lexeme: ">",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: GreaterEqual,
+            lexeme: ">=",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Equal,
+            lexeme: "=",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Greater,
+            lexeme: ">",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Equal,
+            lexeme: "=",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: Less,
+            lexeme: "<",
+            literal: Nil,
+            line: 1,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 1,
+        },
+    ],
+)

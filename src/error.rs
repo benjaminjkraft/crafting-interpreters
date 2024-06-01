@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Debug)]
 pub struct LoxError {
     pub line: usize,
     pub loc: String,

@@ -1,0 +1,98 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"\\n\\n!a and !!b and !!c != d == e////\")"
+---
+Ok(
+    [
+        Token {
+            type_: Bang,
+            lexeme: "!",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "a",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: And,
+            lexeme: "and",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Bang,
+            lexeme: "!",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Bang,
+            lexeme: "!",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "b",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: And,
+            lexeme: "and",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Bang,
+            lexeme: "!",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Bang,
+            lexeme: "!",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "c",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: BangEqual,
+            lexeme: "!=",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "d",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: EqualEqual,
+            lexeme: "==",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "e",
+            literal: Nil,
+            line: 3,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 3,
+        },
+    ],
+)

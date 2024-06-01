@@ -1,0 +1,14 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"// asdf\\n\")"
+---
+Ok(
+    [
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 2,
+        },
+    ],
+)

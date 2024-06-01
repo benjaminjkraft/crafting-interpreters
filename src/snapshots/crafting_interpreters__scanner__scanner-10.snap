@@ -1,0 +1,28 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"\\n\\n\\t\\t   \\n\\t\\t   \\\"asdf!!\\\"\\n\\nvar2\")"
+---
+Ok(
+    [
+        Token {
+            type_: StringLiteral,
+            lexeme: "\"asdf!!\"",
+            literal: String(
+                "asdf!!",
+            ),
+            line: 4,
+        },
+        Token {
+            type_: Identifier,
+            lexeme: "var2",
+            literal: Nil,
+            line: 6,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 6,
+        },
+    ],
+)

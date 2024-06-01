@@ -1,0 +1,22 @@
+---
+source: src/scanner.rs
+expression: "scan_tokens(\"1\")"
+---
+Ok(
+    [
+        Token {
+            type_: Number,
+            lexeme: "1",
+            literal: Int(
+                1,
+            ),
+            line: 1,
+        },
+        Token {
+            type_: EOF,
+            lexeme: "",
+            literal: Nil,
+            line: 1,
+        },
+    ],
+)
