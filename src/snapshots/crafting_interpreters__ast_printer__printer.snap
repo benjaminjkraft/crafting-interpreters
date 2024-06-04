@@ -1,0 +1,5 @@
+---
+source: src/ast_printer.rs
+expression: printer.print(expr)
+---
+"(* (- (123)) (group (45.67)))"

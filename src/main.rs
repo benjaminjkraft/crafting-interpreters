@@ -3,6 +3,8 @@ use std::env;
 use std::fs;
 use std::io;
 
+mod ast;
+mod ast_printer;
 mod error;
 mod object;
 mod scanner;

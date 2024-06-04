@@ -212,10 +212,10 @@ pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
 
 #[derive(Debug)]
 pub struct Token<'a> {
-    type_: TokenType,
-    lexeme: &'a str,
-    literal: object::Object,
-    line: usize,
+    pub type_: TokenType,
+    pub lexeme: &'a str,
+    pub literal: object::Object,
+    pub line: usize,
 }
 
 impl<'a> fmt::Display for Token<'a> {
