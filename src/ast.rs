@@ -10,6 +10,47 @@ pub enum Expr<'a> {
     Unary(UnaryExpr<'a>),
 }
 
+pub struct BinaryExpr<'a> {
+    pub left: Box<Expr<'a>>,
+    pub operator: scanner::Token<'a>,
+    pub right: Box<Expr<'a>>,
+}
+
+pub struct GroupingExpr<'a> {
+    pub expr: Box<Expr<'a>>,
+}
+
+pub struct LiteralExpr {
+    pub value: object::Object,
+}
+
+pub struct UnaryExpr<'a> {
+    pub operator: scanner::Token<'a>,
+    pub right: Box<Expr<'a>>,
+}
+
+macro_rules! visitor_impl {
+    ( $type:ident < $lt:lifetime >, $method:ident  ) => {
+        impl<$lt, R> Visited<$lt, R> for $type<$lt> {
+            fn accept(&self, visitor: impl Visitor<$lt, R>) -> R {
+                visitor.$method(&self)
+            }
+        }
+    };
+    ( $type:ident, $method:ident  ) => {
+        impl<'a, R> Visited<'a, R> for $type {
+            fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
+                visitor.$method(&self)
+            }
+        }
+    };
+}
+
+visitor_impl!(BinaryExpr<'a>, visit_binary_expr);
+visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
+visitor_impl!(LiteralExpr, visit_literal_expr);
+visitor_impl!(UnaryExpr<'a>, visit_unary_expr);
+
 impl<'a, R> Visited<'a, R> for Expr<'a> {
     fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
         match self {
@@ -18,49 +59,6 @@ impl<'a, R> Visited<'a, R> for Expr<'a> {
             Expr::Literal(e) => e.accept(visitor),
             Expr::Unary(e) => e.accept(visitor),
         }
-    }
-}
-
-pub struct BinaryExpr<'a> {
-    pub left: Box<Expr<'a>>,
-    pub operator: scanner::Token<'a>,
-    pub right: Box<Expr<'a>>,
-}
-
-impl<'a, R> Visited<'a, R> for BinaryExpr<'a> {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
-        visitor.visit_binary_expr(&self)
-    }
-}
-
-pub struct GroupingExpr<'a> {
-    pub expr: Box<Expr<'a>>,
-}
-
-impl<'a, R> Visited<'a, R> for GroupingExpr<'a> {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
-        visitor.visit_grouping_expr(&self)
-    }
-}
-
-pub struct LiteralExpr {
-    pub value: object::Object,
-}
-
-impl<'a, R> Visited<'a, R> for LiteralExpr {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
-        visitor.visit_literal_expr(&self)
-    }
-}
-
-pub struct UnaryExpr<'a> {
-    pub operator: scanner::Token<'a>,
-    pub right: Box<Expr<'a>>,
-}
-
-impl<'a, R> Visited<'a, R> for UnaryExpr<'a> {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
-        visitor.visit_unary_expr(&self)
     }
 }
 
