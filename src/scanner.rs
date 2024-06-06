@@ -92,7 +92,7 @@ impl<'a> Scanner<'a> {
     fn err(&mut self, message: String) -> Result<Option<Token<'a>>, LoxError> {
         Err(LoxError {
             line: self.line,
-            loc: "".to_string(),
+            loc: String::new(),
             message,
         })
     }
@@ -210,7 +210,7 @@ pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
     scanner.scan_tokens()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token<'a> {
     pub type_: TokenType,
     pub lexeme: &'a str,
@@ -224,7 +224,7 @@ impl<'a> fmt::Display for Token<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,

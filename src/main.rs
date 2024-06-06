@@ -7,6 +7,7 @@ mod ast;
 mod ast_printer;
 mod error;
 mod object;
+mod parser;
 mod scanner;
 
 fn main() {
@@ -45,9 +46,8 @@ fn run_prompt() {
 }
 
 fn run(source: String) -> Result<(), LoxError> {
-    let sc = scanner::scan_tokens(&source)?;
-    for token in sc {
-        println!("{}", token)
-    }
+    let tokens = scanner::scan_tokens(&source)?;
+    let expr = parser::parse(tokens)?;
+    println!("{}", ast_printer::print(expr));
     Ok(())
 }

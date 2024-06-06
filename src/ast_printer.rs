@@ -1,16 +1,16 @@
 use crate::ast::Visited;
 use crate::ast::*;
-use crate::object;
-use crate::scanner;
+#[cfg(test)]
+use crate::parser;
 use itertools::Itertools;
 
-pub struct AstPrinter {}
+struct AstPrinter {}
+
+pub fn print<'a>(expr: Expr<'a>) -> String {
+    expr.accept(&AstPrinter {})
+}
 
 impl<'a> AstPrinter {
-    pub fn print(&self, expr: Expr<'a>) -> String {
-        expr.accept(self)
-    }
-
     fn parenthesize(&self, name: &'a str, exprs: Vec<&Box<Expr<'a>>>) -> String {
         return format!(
             "({}{})",
@@ -40,30 +40,5 @@ impl<'a> Visitor<'a, String> for &AstPrinter {
 
 #[test]
 fn test_printer() {
-    let expr = Expr::Binary(BinaryExpr {
-        left: Box::new(Expr::Unary(UnaryExpr {
-            operator: scanner::Token {
-                type_: scanner::TokenType::Minus,
-                lexeme: "-",
-                literal: object::Object::Nil,
-                line: 1,
-            },
-            right: Box::new(Expr::Literal(LiteralExpr {
-                value: object::Object::Int(123),
-            })),
-        })),
-        operator: scanner::Token {
-            type_: scanner::TokenType::Star,
-            lexeme: "*",
-            literal: object::Object::Nil,
-            line: 1,
-        },
-        right: Box::new(Expr::Grouping(GroupingExpr {
-            expr: Box::new(Expr::Literal(LiteralExpr {
-                value: object::Object::Float(45.67),
-            })),
-        })),
-    });
-    let printer = AstPrinter {};
-    insta::assert_debug_snapshot!(printer.print(expr))
+    insta::assert_debug_snapshot!(print(parser::must_parse("-123*(45.67)")));
 }
