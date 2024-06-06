@@ -1,6 +1,8 @@
 use crate::object;
 use crate::scanner;
+use derive_more::From;
 
+#[derive(From)]
 pub enum Expr<'a> {
     Binary(BinaryExpr<'a>),
     Grouping(GroupingExpr<'a>),

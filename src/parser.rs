@@ -28,11 +28,12 @@ impl<'a> Parser<'a> {
         while self.match_(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous();
             let right = self.comparison()?;
-            expr = Expr::Binary(BinaryExpr {
+            expr = BinaryExpr {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            });
+            }
+            .into();
         }
 
         return Ok(expr);
@@ -48,11 +49,12 @@ impl<'a> Parser<'a> {
         ]) {
             let operator = self.previous();
             let right = self.term()?;
-            expr = Expr::Binary(BinaryExpr {
+            expr = BinaryExpr {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            });
+            }
+            .into();
         }
 
         return Ok(expr);
@@ -63,11 +65,12 @@ impl<'a> Parser<'a> {
         while self.match_(vec![TokenType::Minus, TokenType::Plus]) {
             let operator = self.previous();
             let right = self.factor()?;
-            expr = Expr::Binary(BinaryExpr {
+            expr = BinaryExpr {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            });
+            }
+            .into();
         }
 
         return Ok(expr);
@@ -78,11 +81,12 @@ impl<'a> Parser<'a> {
         while self.match_(vec![TokenType::Slash, TokenType::Star]) {
             let operator = self.previous();
             let right = self.unary()?;
-            expr = Expr::Binary(BinaryExpr {
+            expr = BinaryExpr {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            });
+            }
+            .into();
         }
 
         return Ok(expr);
@@ -92,10 +96,11 @@ impl<'a> Parser<'a> {
         if self.match_(vec![TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
-            return Ok(Expr::Unary(UnaryExpr {
+            return Ok(UnaryExpr {
                 operator,
                 right: Box::new(right),
-            }));
+            }
+            .into());
         }
 
         return self.primary();
@@ -103,25 +108,29 @@ impl<'a> Parser<'a> {
 
     fn primary(&mut self) -> Result<Expr<'a>, LoxError> {
         Ok(if self.match_(vec![TokenType::False]) {
-            Expr::Literal(LiteralExpr {
+            LiteralExpr {
                 value: Object::Bool(false),
-            })
+            }
+            .into()
         } else if self.match_(vec![TokenType::True]) {
-            Expr::Literal(LiteralExpr {
+            LiteralExpr {
                 value: Object::Bool(true),
-            })
+            }
+            .into()
         } else if self.match_(vec![TokenType::Nil]) {
-            Expr::Literal(LiteralExpr { value: Object::Nil })
+            LiteralExpr { value: Object::Nil }.into()
         } else if self.match_(vec![TokenType::Number, TokenType::StringLiteral]) {
-            Expr::Literal(LiteralExpr {
+            LiteralExpr {
                 value: self.previous().literal,
-            })
+            }
+            .into()
         } else if self.match_(vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            Expr::Grouping(GroupingExpr {
+            GroupingExpr {
                 expr: Box::new(expr),
-            })
+            }
+            .into()
         } else {
             return Err(error::err(self.peek(), "Expect expression."));
         })
