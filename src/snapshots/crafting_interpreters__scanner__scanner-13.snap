@@ -13,7 +13,9 @@ Ok(
         Token {
             type_: True,
             lexeme: "true",
-            literal: Nil,
+            literal: Bool(
+                true,
+            ),
             line: 1,
         },
         Token {

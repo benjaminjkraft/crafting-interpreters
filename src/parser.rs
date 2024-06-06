@@ -3,7 +3,6 @@ use crate::ast::*;
 use crate::ast_printer;
 use crate::error;
 use crate::error::LoxError;
-use crate::object::Object;
 #[cfg(test)]
 use crate::scanner;
 use crate::scanner::{Token, TokenType};
@@ -107,33 +106,27 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, LoxError> {
-        Ok(if self.match_(vec![TokenType::False]) {
-            LiteralExpr {
-                value: Object::Bool(false),
-            }
-            .into()
-        } else if self.match_(vec![TokenType::True]) {
-            LiteralExpr {
-                value: Object::Bool(true),
-            }
-            .into()
-        } else if self.match_(vec![TokenType::Nil]) {
-            LiteralExpr { value: Object::Nil }.into()
-        } else if self.match_(vec![TokenType::Number, TokenType::StringLiteral]) {
-            LiteralExpr {
+        if self.match_(vec![
+            TokenType::False,
+            TokenType::True,
+            TokenType::Nil,
+            TokenType::Number,
+            TokenType::StringLiteral,
+        ]) {
+            Ok(LiteralExpr {
                 value: self.previous().literal,
             }
-            .into()
+            .into())
         } else if self.match_(vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            GroupingExpr {
+            Ok(GroupingExpr {
                 expr: Box::new(expr),
             }
-            .into()
+            .into())
         } else {
-            return Err(error::err(self.peek(), "Expect expression."));
-        })
+            Err(error::err(self.peek(), "Expect expression."))
+        }
     }
 
     fn match_(&mut self, types: Vec<TokenType>) -> bool {

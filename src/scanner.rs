@@ -184,7 +184,12 @@ impl<'a> Scanner<'a> {
             .get(&self.source[self.start..self.current])
             .copied()
             .unwrap_or(Identifier);
-        self.token(type_)
+        match type_ {
+            True => self.token_literal(type_, Object::Bool(true)),
+            False => self.token_literal(type_, Object::Bool(false)),
+            Nil => self.token_literal(type_, Object::Nil),
+            _ => self.token(type_),
+        }
     }
 }
 
