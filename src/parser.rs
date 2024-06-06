@@ -22,11 +22,15 @@ impl<'a> Parser<'a> {
         return self.equality();
     }
 
-    fn equality(&mut self) -> Result<Expr<'a>, LoxError> {
-        let mut expr = self.comparison()?;
-        while self.match_(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
+    fn binary_expression(
+        &mut self,
+        tokens: Vec<TokenType>,
+        next: &mut dyn FnMut(&mut Self) -> Result<Expr<'a>, LoxError>,
+    ) -> Result<Expr<'a>, LoxError> {
+        let mut expr = next(self)?;
+        while self.match_(&tokens) {
             let operator = self.previous();
-            let right = self.comparison()?;
+            let right = next(self)?;
             expr = BinaryExpr {
                 left: Box::new(expr),
                 operator,
@@ -36,63 +40,41 @@ impl<'a> Parser<'a> {
         }
 
         return Ok(expr);
+    }
+
+    fn equality(&mut self) -> Result<Expr<'a>, LoxError> {
+        self.binary_expression(
+            vec![TokenType::BangEqual, TokenType::EqualEqual],
+            &mut |self_| self_.comparison(),
+        )
     }
 
     fn comparison(&mut self) -> Result<Expr<'a>, LoxError> {
-        let mut expr = self.term()?;
-        while self.match_(vec![
-            TokenType::Greater,
-            TokenType::GreaterEqual,
-            TokenType::Less,
-            TokenType::LessEqual,
-        ]) {
-            let operator = self.previous();
-            let right = self.term()?;
-            expr = BinaryExpr {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-            }
-            .into();
-        }
-
-        return Ok(expr);
+        self.binary_expression(
+            vec![
+                TokenType::Greater,
+                TokenType::GreaterEqual,
+                TokenType::Less,
+                TokenType::LessEqual,
+            ],
+            &mut |self_| self_.term(),
+        )
     }
 
     fn term(&mut self) -> Result<Expr<'a>, LoxError> {
-        let mut expr = self.factor()?;
-        while self.match_(vec![TokenType::Minus, TokenType::Plus]) {
-            let operator = self.previous();
-            let right = self.factor()?;
-            expr = BinaryExpr {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-            }
-            .into();
-        }
-
-        return Ok(expr);
+        self.binary_expression(vec![TokenType::Minus, TokenType::Plus], &mut |self_| {
+            self_.factor()
+        })
     }
 
     fn factor(&mut self) -> Result<Expr<'a>, LoxError> {
-        let mut expr = self.unary()?;
-        while self.match_(vec![TokenType::Slash, TokenType::Star]) {
-            let operator = self.previous();
-            let right = self.unary()?;
-            expr = BinaryExpr {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-            }
-            .into();
-        }
-
-        return Ok(expr);
+        self.binary_expression(vec![TokenType::Slash, TokenType::Star], &mut |self_| {
+            self_.unary()
+        })
     }
 
     fn unary(&mut self) -> Result<Expr<'a>, LoxError> {
-        if self.match_(vec![TokenType::Bang, TokenType::Minus]) {
+        if self.match_(&vec![TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
             return Ok(UnaryExpr {
@@ -106,7 +88,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, LoxError> {
-        if self.match_(vec![
+        if self.match_(&vec![
             TokenType::False,
             TokenType::True,
             TokenType::Nil,
@@ -117,7 +99,7 @@ impl<'a> Parser<'a> {
                 value: self.previous().literal,
             }
             .into())
-        } else if self.match_(vec![TokenType::LeftParen]) {
+        } else if self.match_(&vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
             Ok(GroupingExpr {
@@ -129,9 +111,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn match_(&mut self, types: Vec<TokenType>) -> bool {
+    fn match_(&mut self, types: &Vec<TokenType>) -> bool {
         types.into_iter().any(|type_| {
-            if self.check(type_) {
+            if self.check(*type_) {
                 self.advance();
                 true
             } else {
