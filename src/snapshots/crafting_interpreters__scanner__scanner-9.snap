@@ -7,8 +7,8 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1",
-            literal: Int(
-                1,
+            literal: Number(
+                1.0,
             ),
             line: 1,
         },

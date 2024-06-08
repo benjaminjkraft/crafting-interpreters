@@ -170,11 +170,7 @@ impl<'a> Scanner<'a> {
             self.advance_all(is_digit);
         }
         let val = &self.source[self.start..self.current];
-        if decimal {
-            self.token_literal(Number, Object::Float(val.parse().unwrap()))
-        } else {
-            self.token_literal(Number, Object::Int(val.parse().unwrap()))
-        }
+        self.token_literal(Number, Object::Number(val.parse().unwrap()))
     }
 
     fn identifier(&mut self) -> Option<Token<'a>> {

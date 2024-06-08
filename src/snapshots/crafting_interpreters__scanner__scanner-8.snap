@@ -7,8 +7,8 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1",
-            literal: Int(
-                1,
+            literal: Number(
+                1.0,
             ),
             line: 1,
         },
@@ -21,7 +21,7 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1.1",
-            literal: Float(
+            literal: Number(
                 1.1,
             ),
             line: 1,
@@ -35,7 +35,7 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1.23",
-            literal: Float(
+            literal: Number(
                 1.23,
             ),
             line: 1,
@@ -49,7 +49,7 @@ Ok(
         Token {
             type_: Number,
             lexeme: "123.45",
-            literal: Float(
+            literal: Number(
                 123.45,
             ),
             line: 1,
