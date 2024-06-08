@@ -7,11 +7,11 @@ use itertools::Itertools;
 struct AstPrinter {}
 
 pub fn print<'a>(expr: Expr<'a>) -> String {
-    expr.accept(&AstPrinter {})
+    expr.accept(&mut AstPrinter {})
 }
 
 impl<'a> AstPrinter {
-    fn parenthesize(&self, name: &'a str, exprs: Vec<&Box<Expr<'a>>>) -> String {
+    fn parenthesize(&mut self, name: &'a str, exprs: Vec<&Box<Expr<'a>>>) -> String {
         return format!(
             "({}{})",
             name,
@@ -23,17 +23,17 @@ impl<'a> AstPrinter {
     }
 }
 
-impl<'a> Visitor<'a, String> for &AstPrinter {
-    fn visit_binary_expr(&self, node: &BinaryExpr<'a>) -> String {
+impl<'a> Visitor<'a, String> for AstPrinter {
+    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.left, &node.right])
     }
-    fn visit_grouping_expr(&self, node: &GroupingExpr<'a>) -> String {
+    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> String {
         self.parenthesize("group", vec![&node.expr])
     }
-    fn visit_literal_expr(&self, node: &LiteralExpr) -> String {
+    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> String {
         self.parenthesize(&node.value.to_string(), vec![])
     }
-    fn visit_unary_expr(&self, node: &UnaryExpr<'a>) -> String {
+    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.right])
     }
 }

@@ -31,15 +31,15 @@ pub struct UnaryExpr<'a> {
 
 macro_rules! visitor_impl {
     ( $type:ident < $lt:lifetime >, $method:ident  ) => {
-        impl<$lt, R> Visited<$lt, R> for $type<$lt> {
-            fn accept(&self, visitor: impl Visitor<$lt, R>) -> R {
+        impl<$lt, R, V: Visitor<$lt, R>> Visited<$lt, R, V> for $type<$lt> {
+            fn accept(&self, visitor: &mut V) -> R {
                 visitor.$method(&self)
             }
         }
     };
     ( $type:ident, $method:ident  ) => {
-        impl<'a, R> Visited<'a, R> for $type {
-            fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
+        impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for $type {
+            fn accept(&self, visitor: &mut V) -> R {
                 visitor.$method(&self)
             }
         }
@@ -51,8 +51,8 @@ visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
 visitor_impl!(LiteralExpr, visit_literal_expr);
 visitor_impl!(UnaryExpr<'a>, visit_unary_expr);
 
-impl<'a, R> Visited<'a, R> for Expr<'a> {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R {
+impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Expr<'a> {
+    fn accept(&self, visitor: &mut V) -> R {
         match self {
             Expr::Binary(e) => e.accept(visitor),
             Expr::Grouping(e) => e.accept(visitor),
@@ -63,14 +63,14 @@ impl<'a, R> Visited<'a, R> for Expr<'a> {
 }
 
 #[allow(unused_variables)]
-pub trait Visited<'a, R> {
-    fn accept(&self, visitor: impl Visitor<'a, R>) -> R;
+pub trait Visited<'a, R, V: Visitor<'a, R>> {
+    fn accept(&self, visitor: &mut V) -> R;
 }
 
 #[allow(unused_variables)]
 pub trait Visitor<'a, R> {
-    fn visit_binary_expr(&self, node: &BinaryExpr<'a>) -> R;
-    fn visit_grouping_expr(&self, node: &GroupingExpr<'a>) -> R;
-    fn visit_literal_expr(&self, node: &LiteralExpr) -> R;
-    fn visit_unary_expr(&self, node: &UnaryExpr<'a>) -> R;
+    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> R;
+    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> R;
+    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> R;
+    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> R;
 }
