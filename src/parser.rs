@@ -107,7 +107,7 @@ impl<'a> Parser<'a> {
             }
             .into())
         } else {
-            Err(error::err(self.peek(), "Expect expression."))
+            Err(error::parse_error(self.peek(), "Expect expression."))
         }
     }
 
@@ -127,7 +127,7 @@ impl<'a> Parser<'a> {
             return Ok(self.advance());
         }
 
-        return Err(error::err(self.peek(), message));
+        return Err(error::parse_error(self.peek(), message));
     }
 
     fn synchronize(&mut self) {

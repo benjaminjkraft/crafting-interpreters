@@ -93,6 +93,7 @@ impl<'a> Scanner<'a> {
         Err(LoxError {
             line: self.line,
             loc: String::new(),
+            exit: 65,
             message,
         })
     }

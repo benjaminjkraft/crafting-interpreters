@@ -5,6 +5,7 @@ use std::fmt;
 pub struct LoxError {
     pub line: usize,
     pub loc: String,
+    pub exit: u8,
     pub message: String,
 }
 
@@ -18,7 +19,7 @@ impl fmt::Display for LoxError {
     }
 }
 
-pub fn err(token: scanner::Token, message: &str) -> LoxError {
+pub fn parse_error(token: scanner::Token, message: &str) -> LoxError {
     let loc = if token.type_ == scanner::TokenType::EOF {
         " at end".to_string()
     } else {
@@ -27,6 +28,16 @@ pub fn err(token: scanner::Token, message: &str) -> LoxError {
     LoxError {
         line: token.line,
         loc,
+        exit: 65,
         message: message.to_string(),
     }
+}
+
+pub fn runtime_error<T>(token: &scanner::Token, message: &str) -> Result<T, LoxError> {
+    Err(LoxError {
+        line: token.line,
+        loc: "".to_string(),
+        exit: 70,
+        message: message.to_string(),
+    })
 }
