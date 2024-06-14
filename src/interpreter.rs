@@ -5,16 +5,28 @@ use crate::parser;
 use crate::scanner;
 use crate::scanner::TokenType;
 
-pub struct Interpreter {}
-
-pub fn evaluate_source(interpreter: &mut Interpreter, source: &str) -> Result<Object, LoxError> {
-    let tokens = scanner::scan_tokens(source)?;
-    let expr = parser::parse(tokens)?;
-    interpreter.evaluate(&expr)
+pub struct Interpreter<F: FnMut(String)> {
+    pub printer: F,
 }
 
-impl<'a> Interpreter {
-    pub fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Object, LoxError> {
+pub fn evaluate_source<F: FnMut(String)>(
+    interpreter: &mut Interpreter<F>,
+    source: &str,
+) -> Result<(), LoxError> {
+    let tokens = scanner::scan_tokens(source)?;
+    let prog = parser::parse(tokens)?;
+    for stmt in prog.iter() {
+        interpreter.execute(&stmt)?;
+    }
+    Ok(())
+}
+
+impl<'a, F: FnMut(String)> Interpreter<F> {
+    fn execute(&mut self, stmt: &Stmt<'a>) -> Result<Object, LoxError> {
+        stmt.accept(self)
+    }
+
+    fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Object, LoxError> {
         expr.accept(self)
     }
 
@@ -51,7 +63,7 @@ impl<'a> Interpreter {
     }
 }
 
-impl<'a> Visitor<'a, Result<Object, LoxError>> for Interpreter {
+impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> Result<Object, LoxError> {
         let left = self.evaluate(&node.left)?;
         let right = self.evaluate(&node.right)?;
@@ -113,41 +125,64 @@ impl<'a> Visitor<'a, Result<Object, LoxError>> for Interpreter {
             _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
         }
     }
+
+    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
+        self.evaluate(&node.expr)?;
+        // TODO: visitor with different return for stmts?
+        return Ok(Object::Nil);
+    }
+
+    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<Object, LoxError> {
+        let value = self.evaluate(&node.expr)?;
+        let stringified = self.stringify(value);
+        (self.printer)(stringified);
+        // TODO: visitor with different return for stmts?
+        return Ok(Object::Nil);
+    }
 }
 
 #[cfg(test)]
-fn assert_evaluates_to(source: &str, expected: Result<Object, &str>) {
-    let mut interpreter = Interpreter {};
-    let actual = evaluate_source(&mut interpreter, source);
+pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
+    let mut printed: Vec<String> = Vec::new();
+    let mut interpreter = Interpreter {
+        printer: |s| printed.push(s),
+    };
+    evaluate_source(&mut interpreter, source)?;
+    Ok(printed)
+}
+
+#[cfg(test)]
+fn assert_prints(source: &str, expected: Result<Vec<&str>, &str>) {
+    let actual = execute_for_tests(source);
     match (actual, expected) {
-        (Ok(a), Ok(e)) => assert_eq!(a, e),
-        (Ok(a), Err(e)) => assert!(false, "Expected error {}, got {}", e, a),
+        (Ok(a), Ok(e)) => assert_eq!(a, e.iter().map(|s| s.to_string()).collect::<Vec<_>>()),
+        (Ok(a), Err(e)) => assert!(false, "Expected error {}, got {:?}", e, a),
         (Err(a), Err(e)) => assert_eq!(a.to_string(), e),
-        (Err(a), Ok(e)) => assert!(false, "Expected {}, got error {}", e, a),
+        (Err(a), Ok(e)) => assert!(false, "Expected {:?}, got error {}", e, a),
     }
 }
 
 #[test]
 fn test_evaluate_expr() {
-    assert_evaluates_to("1 + 2", Ok(Object::Number(3.0)));
-    assert_evaluates_to("1 == 1", Ok(Object::Bool(true)));
-    assert_evaluates_to("1 == true", Ok(Object::Bool(false)));
-    assert_evaluates_to("1/0 == 1/0", Ok(Object::Bool(true)));
-    assert_evaluates_to("0/0 == 0/0", Ok(Object::Bool(false)));
-    assert_evaluates_to("false == nil", Ok(Object::Bool(false)));
-    assert_evaluates_to("1 >= 1", Ok(Object::Bool(true)));
-    assert_evaluates_to("1 > 1", Ok(Object::Bool(false)));
-    assert_evaluates_to(
-        "true > false",
+    assert_prints("print 1 + 2;", Ok(vec!["3"]));
+    assert_prints("print 1 == 1;", Ok(vec!["true"]));
+    assert_prints("print 1 == true;", Ok(vec!["false"]));
+    assert_prints("print 1/0 == 1/0;", Ok(vec!["true"]));
+    assert_prints("print 0/0 == 0/0;", Ok(vec!["false"]));
+    assert_prints("print false == nil;", Ok(vec!["false"]));
+    assert_prints("print 1 >= 1;", Ok(vec!["true"]));
+    assert_prints("print 1 > 1;", Ok(vec!["false"]));
+    assert_prints(
+        "print true > false;",
         Err("[line 1] Error: invalid types for comparison"),
     );
-    assert_evaluates_to(
-        r#"1 + "a""#,
+    assert_prints(
+        r#"print 1 + "a";"#,
         Err("[line 1] Error: invalid types for addition"),
     );
-    assert_evaluates_to(r#""a" + "b""#, Ok(Object::String("ab".to_string())));
-    assert_evaluates_to("!true", Ok(Object::Bool(false)));
-    assert_evaluates_to("!nil", Ok(Object::Bool(true)));
-    assert_evaluates_to("1 + (2 + 3)", Ok(Object::Number(6.0)));
-    assert_evaluates_to(r#""a" + "b" + "c""#, Ok(Object::String("abc".to_string())));
+    assert_prints(r#"print "a" + "b";"#, Ok(vec!["ab"]));
+    assert_prints("print !true;", Ok(vec!["false"]));
+    assert_prints("print !nil;", Ok(vec!["true"]));
+    assert_prints("print 1 + (2 + 3);", Ok(vec!["6"]));
+    assert_prints(r#"print "a" + "b" + "c";"#, Ok(vec!["abc"]));
 }

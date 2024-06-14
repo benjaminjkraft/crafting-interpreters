@@ -12,12 +12,46 @@ struct Parser<'a> {
     current: usize,
 }
 
-pub fn parse<'a>(tokens: Vec<Token<'a>>) -> Result<Expr<'a>, LoxError> {
+pub fn parse<'a>(tokens: Vec<Token<'a>>) -> Result<Program<'a>, LoxError> {
     let mut parser = Parser { tokens, current: 0 };
-    return parser.expression();
+    return parser.program();
 }
 
 impl<'a> Parser<'a> {
+    fn program(&mut self) -> Result<Program<'a>, LoxError> {
+        let mut statements = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement()?)
+        }
+
+        return Ok(statements);
+    }
+
+    fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        if self.match_(&vec![TokenType::Print]) {
+            return self.print_statement();
+        }
+        return self.expression_statement();
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        return Ok(PrintStmt {
+            expr: Box::new(value),
+        }
+        .into());
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        return Ok(ExprStmt {
+            expr: Box::new(value),
+        }
+        .into());
+    }
+
     fn expression(&mut self) -> Result<Expr<'a>, LoxError> {
         return self.equality();
     }
@@ -182,7 +216,7 @@ impl<'a> Parser<'a> {
 }
 
 #[cfg(test)]
-pub fn must_parse<'a>(input: &'a str) -> Expr<'a> {
+pub fn must_parse<'a>(input: &'a str) -> Program<'a> {
     parse(scanner::scan_tokens(input).unwrap()).unwrap()
 }
 
@@ -193,12 +227,17 @@ fn assert_parses_to(input: &str, printed: &str) {
 
 #[test]
 fn test_parser() {
-    assert_parses_to("1+2", "(+ (1) (2))");
+    assert_parses_to("1+2;", "(expr (+ (1) (2)))");
     assert_parses_to(
-        "1 + 2 == 3 / -4 - 5 >= 6",
-        "(== (+ (1) (2)) (>= (- (/ (3) (- (4))) (5)) (6)))",
+        "1 + 2 == 3 / -4 - 5 >= 6;",
+        "(expr (== (+ (1) (2)) (>= (- (/ (3) (- (4))) (5)) (6))))",
     );
-    assert_parses_to("---6", "(- (- (- (6))))");
-    assert_parses_to("true == false != nil", "(!= (== (true) (false)) (nil))");
-    assert_parses_to("1.2 + \"four\"", "(+ (1.2) (four))");
+    assert_parses_to("---6;", "(expr (- (- (- (6)))))");
+    assert_parses_to(
+        "true == false != nil;",
+        "(expr (!= (== (true) (false)) (nil)))",
+    );
+    assert_parses_to("1.2 + \"four\";", "(expr (+ (1.2) (four)))");
+    assert_parses_to("print 1+2;", "(print (+ (1) (2)))");
+    assert_parses_to("1+2;print 1+2;", "(expr (+ (1) (2)))\n(print (+ (1) (2)))");
 }

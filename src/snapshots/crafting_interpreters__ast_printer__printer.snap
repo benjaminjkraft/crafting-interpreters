@@ -1,5 +1,5 @@
 ---
 source: src/ast_printer.rs
-expression: printer.print(expr)
+expression: "print(parser::must_parse(\"-123*(45.67);\"))"
 ---
-"(* (- (123)) (group (45.67)))"
+"(expr (* (- (123)) (group (45.67))))"

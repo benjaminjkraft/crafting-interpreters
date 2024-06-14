@@ -6,8 +6,10 @@ use itertools::Itertools;
 
 struct AstPrinter {}
 
-pub fn print<'a>(expr: Expr<'a>) -> String {
-    expr.accept(&mut AstPrinter {})
+pub fn print<'a>(prog: Program<'a>) -> String {
+    prog.into_iter()
+        .map(|stmt| stmt.accept(&mut AstPrinter {}))
+        .join("\n")
 }
 
 impl<'a> AstPrinter {
@@ -36,9 +38,16 @@ impl<'a> Visitor<'a, String> for AstPrinter {
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.right])
     }
+
+    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
+        self.parenthesize("expr", vec![&node.expr])
+    }
+    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> String {
+        self.parenthesize("print", vec![&node.expr])
+    }
 }
 
 #[test]
 fn test_printer() {
-    insta::assert_debug_snapshot!(print(parser::must_parse("-123*(45.67)")));
+    insta::assert_debug_snapshot!(print(parser::must_parse("-123*(45.67);")));
 }
