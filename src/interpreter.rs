@@ -73,6 +73,11 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 }
 
 impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
+    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
+        let value = self.evaluate(&node.value)?;
+        self.environment.assign(&node.name, value.clone())?;
+        Ok(value)
+    }
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> Result<Object, LoxError> {
         let left = self.evaluate(&node.left)?;
         let right = self.evaluate(&node.right)?;
@@ -213,4 +218,12 @@ fn test_evaluate_expr() {
     assert_prints("var v; print v;", Ok(vec!["nil"]));
     assert_prints("var v = 3; print v;", Ok(vec!["3"]));
     assert_prints("var v = 3; var v = 4; print v;", Ok(vec!["4"]));
+    assert_prints("var v = 3; v = 4; print v;", Ok(vec!["4"]));
+    assert_prints(
+        "var v; var w; v = w = 4; print v; print w;",
+        Ok(vec!["4", "4"]),
+    );
+    assert_prints("var v = 3; v = v + 1; print v;", Ok(vec!["4"]));
+    assert_prints("var v = 3; v = (v = v + 1) + 1; print v;", Ok(vec!["5"]));
+    assert_prints("v = 3;", Err("[line 1] Error: Undefined variable 'v'."));
 }

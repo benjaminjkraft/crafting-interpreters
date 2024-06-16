@@ -26,6 +26,9 @@ impl<'a> AstPrinter {
 }
 
 impl<'a> Visitor<'a, String> for AstPrinter {
+    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> String {
+        self.parenthesize(&format!("assign {}", node.name.lexeme), vec![&node.value])
+    }
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.left, &node.right])
     }
@@ -49,10 +52,8 @@ impl<'a> Visitor<'a, String> for AstPrinter {
         self.parenthesize("print", vec![&node.expr])
     }
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> String {
-        match &node.initializer {
-            None => format!("(var {})", node.name.lexeme),
-            Some(init) => self.parenthesize(&format!("var {} =", node.name.lexeme), vec![&init]),
-        }
+        let start = format!("var {}", node.name.lexeme);
+        self.parenthesize(&start, node.initializer.iter().collect())
     }
 }
 

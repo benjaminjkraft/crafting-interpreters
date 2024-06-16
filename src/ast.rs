@@ -6,6 +6,7 @@ pub type Program<'a> = Vec<Stmt<'a>>;
 
 #[derive(Debug, From)]
 pub enum Expr<'a> {
+    Assign(AssignExpr<'a>),
     Binary(BinaryExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
@@ -18,6 +19,12 @@ pub enum Stmt<'a> {
     Expr(ExprStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
+}
+
+#[derive(Debug)]
+pub struct AssignExpr<'a> {
+    pub name: scanner::Token<'a>,
+    pub value: Box<Expr<'a>>,
 }
 
 #[derive(Debug)]
@@ -81,6 +88,7 @@ macro_rules! visitor_impl {
     };
 }
 
+visitor_impl!(AssignExpr<'a>, visit_assign_expr);
 visitor_impl!(BinaryExpr<'a>, visit_binary_expr);
 visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
 visitor_impl!(LiteralExpr, visit_literal_expr);
@@ -93,6 +101,7 @@ visitor_impl!(VarStmt<'a>, visit_var_stmt);
 impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Expr<'a> {
     fn accept(&self, visitor: &mut V) -> R {
         match self {
+            Expr::Assign(e) => e.accept(visitor),
             Expr::Binary(e) => e.accept(visitor),
             Expr::Grouping(e) => e.accept(visitor),
             Expr::Literal(e) => e.accept(visitor),
@@ -119,6 +128,7 @@ pub trait Visited<'a, R, V: Visitor<'a, R>> {
 
 #[allow(unused_variables)]
 pub trait Visitor<'a, R> {
+    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> R;
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> R;
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> R;
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> R;

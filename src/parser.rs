@@ -87,7 +87,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expr<'a>, LoxError> {
-        return self.equality();
+        return self.assignment();
     }
 
     fn binary_expression(
@@ -108,6 +108,27 @@ impl<'a> Parser<'a> {
         }
 
         return Ok(expr);
+    }
+
+    fn assignment(&mut self) -> Result<Expr<'a>, LoxError> {
+        let expr = self.equality()?;
+        if self.match_(&vec![TokenType::Equal]) {
+            let var = match expr {
+                Expr::Variable(v) => Ok(v),
+                _ => Err(error::parse_error(
+                    self.previous(),
+                    "Invalid assignment target.",
+                )),
+            }?;
+            let value = self.assignment()?;
+            Ok(AssignExpr {
+                name: var.name,
+                value: Box::new(value),
+            }
+            .into())
+        } else {
+            Ok(expr)
+        }
     }
 
     fn equality(&mut self) -> Result<Expr<'a>, LoxError> {
@@ -281,7 +302,19 @@ fn test_parser() {
     assert_parses_to("1+2;print 1+2;", "(expr (+ (1) (2)))\n(print (+ (1) (2)))");
     assert_parses_to(
         "var v = 1; v+2;",
-        "(var v = (1))\n(expr (+ (variable v) (2)))",
+        "(var v (1))\n(expr (+ (variable v) (2)))",
+    );
+    assert_parses_to(
+        "var v = 1; v = 3 + 2;",
+        "(var v (1))\n(expr (assign v (+ (3) (2))))",
+    );
+    assert_parses_to(
+        "var v = 1; (v = 3) + 2;",
+        "(var v (1))\n(expr (+ (group (assign v (3))) (2)))",
+    );
+    assert_parses_to(
+        "var v; var w; v = w = 3;",
+        "(var v)\n(var w)\n(expr (assign v (assign w (3))))",
     );
     // TODO: test parse errors
 }

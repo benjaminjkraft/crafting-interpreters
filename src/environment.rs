@@ -22,7 +22,19 @@ impl<'a> Environment {
     pub fn get(&mut self, name: &scanner::Token<'a>) -> Result<Object, LoxError> {
         match self.values.get(name.lexeme) {
             Some(obj) => Ok(obj.clone()),
-            None => error::runtime_error(&name, &format!("Undefined variable '{}'.", name.lexeme)),
+            None => undefined(name),
         }
     }
+
+    pub fn assign(&mut self, name: &scanner::Token<'a>, value: Object) -> Result<(), LoxError> {
+        if self.values.contains_key(name.lexeme) {
+            Ok(self.define(name.lexeme, value))
+        } else {
+            undefined(name)
+        }
+    }
+}
+
+fn undefined<'a, T>(name: &scanner::Token<'a>) -> Result<T, LoxError> {
+    error::runtime_error(&name, &format!("Undefined variable '{}'.", name.lexeme))
 }
