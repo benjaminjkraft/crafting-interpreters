@@ -5,16 +5,18 @@ use crate::object::Object;
 use crate::parser;
 use crate::scanner;
 use crate::scanner::TokenType;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Interpreter<F: FnMut(String)> {
     printer: F,
-    environment: Environment,
+    environment: Rc<RefCell<Environment>>,
 }
 
 pub fn interpreter() -> Interpreter<impl FnMut(String)> {
     Interpreter {
         printer: |s| println!("{}", s),
-        environment: Environment::new(),
+        environment: Rc::new(RefCell::new(Environment::new())),
     }
 }
 
@@ -33,6 +35,13 @@ pub fn evaluate_source<F: FnMut(String)>(
 impl<'a, F: FnMut(String)> Interpreter<F> {
     fn execute(&mut self, stmt: &Stmt<'a>) -> Result<Object, LoxError> {
         stmt.accept(self)
+    }
+
+    fn execute_block(&mut self, stmts: &Vec<Stmt<'a>>) -> Result<Object, LoxError> {
+        for stmt in stmts {
+            self.execute(&stmt)?;
+        }
+        Ok(Object::Nil)
     }
 
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Object, LoxError> {
@@ -75,7 +84,9 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
         let value = self.evaluate(&node.value)?;
-        self.environment.assign(&node.name, value.clone())?;
+        self.environment
+            .borrow_mut()
+            .assign(&node.name, value.clone())?;
         Ok(value)
     }
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> Result<Object, LoxError> {
@@ -141,7 +152,15 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
     }
 
     fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> Result<Object, LoxError> {
-        return self.environment.get(&node.name);
+        self.environment.borrow().get(&node.name)
+    }
+
+    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> Result<Object, LoxError> {
+        let prev = self.environment.clone();
+        self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
+        let result = self.execute_block(&node.stmts);
+        self.environment = prev;
+        result
     }
 
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
@@ -164,7 +183,9 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
             None => Object::Nil,
         };
 
-        self.environment.define(node.name.lexeme, value);
+        self.environment
+            .borrow_mut()
+            .define(node.name.lexeme, value);
         // TODO: visitor with different return for stmts?
         return Ok(Object::Nil);
     }
@@ -175,7 +196,7 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let mut printed: Vec<String> = Vec::new();
     let mut interpreter = Interpreter {
         printer: |s| printed.push(s),
-        environment: Environment::new(),
+        environment: Rc::new(RefCell::new(Environment::new())),
     };
     evaluate_source(&mut interpreter, source)?;
     Ok(printed)
@@ -226,4 +247,44 @@ fn test_evaluate_expr() {
     assert_prints("var v = 3; v = v + 1; print v;", Ok(vec!["4"]));
     assert_prints("var v = 3; v = (v = v + 1) + 1; print v;", Ok(vec!["5"]));
     assert_prints("v = 3;", Err("[line 1] Error: Undefined variable 'v'."));
+    assert_prints("{}", Ok(vec![]));
+    assert_prints(
+        "var a = 1; { var a = 2; print a; } print a;",
+        Ok(vec!["2", "1"]),
+    );
+    assert_prints(
+        "var a = 1; { var b = 2; print a; print b; } print a;",
+        Ok(vec!["1", "2", "1"]),
+    );
+    assert_prints(
+        "var a = 1; { var b = 2; } print b;",
+        Err("[line 1] Error: Undefined variable 'b'."),
+    );
+    assert_prints(
+        r#"
+            var a = "global a";
+            var b = "global b";
+            var c = "global c";
+            {
+                var a = "outer a";
+                var b = "outer b";
+                {
+                    var a = "inner a";
+                    print a;
+                    print b;
+                    print c;
+                }
+                print a;
+                print b;
+                print c;
+            }
+            print a;
+            print b;
+            print c;
+        "#,
+        Ok(vec![
+            "inner a", "outer b", "global c", "outer a", "outer b", "global c", "global a",
+            "global b", "global c",
+        ]),
+    );
 }

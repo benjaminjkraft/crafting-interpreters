@@ -45,6 +45,15 @@ impl<'a> Visitor<'a, String> for AstPrinter {
         format!("(variable {})", node.name.lexeme)
     }
 
+    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> String {
+        format!(
+            "(block\n{})",
+            node.stmts
+                .iter()
+                .map(|stmt| format!("\t{}\n", (*stmt).accept(self)))
+                .join("")
+        )
+    }
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
         self.parenthesize("expr", vec![&node.expr])
     }

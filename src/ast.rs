@@ -16,6 +16,7 @@ pub enum Expr<'a> {
 
 #[derive(Debug, From)]
 pub enum Stmt<'a> {
+    Block(BlockStmt<'a>),
     Expr(ExprStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
@@ -53,6 +54,11 @@ pub struct UnaryExpr<'a> {
 #[derive(Debug)]
 pub struct VariableExpr<'a> {
     pub name: scanner::Token<'a>,
+}
+
+#[derive(Debug)]
+pub struct BlockStmt<'a> {
+    pub stmts: Vec<Stmt<'a>>,
 }
 
 #[derive(Debug)]
@@ -94,6 +100,7 @@ visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
 visitor_impl!(LiteralExpr, visit_literal_expr);
 visitor_impl!(UnaryExpr<'a>, visit_unary_expr);
 visitor_impl!(VariableExpr<'a>, visit_variable_expr);
+visitor_impl!(BlockStmt<'a>, visit_block_stmt);
 visitor_impl!(ExprStmt<'a>, visit_expr_stmt);
 visitor_impl!(PrintStmt<'a>, visit_print_stmt);
 visitor_impl!(VarStmt<'a>, visit_var_stmt);
@@ -114,6 +121,7 @@ impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Expr<'a> {
 impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Stmt<'a> {
     fn accept(&self, visitor: &mut V) -> R {
         match self {
+            Stmt::Block(e) => e.accept(visitor),
             Stmt::Expr(e) => e.accept(visitor),
             Stmt::Print(e) => e.accept(visitor),
             Stmt::Var(e) => e.accept(visitor),
@@ -134,6 +142,7 @@ pub trait Visitor<'a, R> {
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> R;
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> R;
     fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> R;
+    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> R;
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> R;
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> R;
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> R;

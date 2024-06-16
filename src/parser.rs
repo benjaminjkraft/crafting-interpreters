@@ -62,32 +62,44 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
-        if self.match_(&vec![TokenType::Print]) {
-            return self.print_statement();
+        if self.match_(&vec![TokenType::LeftBrace]) {
+            self.block_statement()
+        } else if self.match_(&vec![TokenType::Print]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
         }
-        return self.expression_statement();
     }
 
     fn print_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        return Ok(PrintStmt {
+        Ok(PrintStmt {
             expr: Box::new(value),
         }
-        .into());
+        .into())
+    }
+
+    fn block_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        let mut stmts = Vec::new();
+        while !self.is_at_end() && !self.check(TokenType::RightBrace) {
+            stmts.push(self.declaration()?);
+        }
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(BlockStmt { stmts }.into())
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        return Ok(ExprStmt {
+        Ok(ExprStmt {
             expr: Box::new(value),
         }
-        .into());
+        .into())
     }
 
     fn expression(&mut self) -> Result<Expr<'a>, LoxError> {
-        return self.assignment();
+        self.assignment()
     }
 
     fn binary_expression(
@@ -107,7 +119,7 @@ impl<'a> Parser<'a> {
             .into();
         }
 
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn assignment(&mut self) -> Result<Expr<'a>, LoxError> {
@@ -315,6 +327,11 @@ fn test_parser() {
     assert_parses_to(
         "var v; var w; v = w = 3;",
         "(var v)\n(var w)\n(expr (assign v (assign w (3))))",
+    );
+    assert_parses_to("{}", "(block\n)");
+    assert_parses_to(
+        "{ var v; var w; print v + w; }",
+        "(block\n\t(var v)\n\t(var w)\n\t(print (+ (variable v) (variable w)))\n)",
     );
     // TODO: test parse errors
 }
