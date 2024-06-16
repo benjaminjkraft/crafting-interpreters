@@ -12,19 +12,53 @@ struct Parser<'a> {
     current: usize,
 }
 
-pub fn parse<'a>(tokens: Vec<Token<'a>>) -> Result<Program<'a>, LoxError> {
+pub fn parse<'a>(tokens: Vec<Token<'a>>) -> Result<Program<'a>, Vec<LoxError>> {
     let mut parser = Parser { tokens, current: 0 };
     return parser.program();
 }
 
 impl<'a> Parser<'a> {
-    fn program(&mut self) -> Result<Program<'a>, LoxError> {
-        let mut statements = Vec::new();
+    fn program(&mut self) -> Result<Program<'a>, Vec<LoxError>> {
+        let mut declarations = Vec::new();
+        let mut errors = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?)
+            let declaration = self.declaration();
+            match declaration {
+                Ok(decl) => declarations.push(decl),
+                Err(err) => {
+                    errors.push(err);
+                    self.synchronize();
+                }
+            }
         }
 
-        return Ok(statements);
+        if errors.len() > 0 {
+            Err(errors)
+        } else {
+            Ok(declarations)
+        }
+    }
+
+    fn declaration(&mut self) -> Result<Stmt<'a>, LoxError> {
+        if self.match_(&vec![TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt<'a>, LoxError> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name")?;
+        let initializer = if self.match_(&vec![TokenType::Equal]) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        return Ok(VarStmt { name, initializer }.into());
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
@@ -131,6 +165,11 @@ impl<'a> Parser<'a> {
         ]) {
             Ok(LiteralExpr {
                 value: self.previous().literal,
+            }
+            .into())
+        } else if self.match_(&vec![TokenType::Identifier]) {
+            Ok(VariableExpr {
+                name: self.previous(),
             }
             .into())
         } else if self.match_(&vec![TokenType::LeftParen]) {
@@ -240,4 +279,9 @@ fn test_parser() {
     assert_parses_to("1.2 + \"four\";", "(expr (+ (1.2) (four)))");
     assert_parses_to("print 1+2;", "(print (+ (1) (2)))");
     assert_parses_to("1+2;print 1+2;", "(expr (+ (1) (2)))\n(print (+ (1) (2)))");
+    assert_parses_to(
+        "var v = 1; v+2;",
+        "(var v = (1))\n(expr (+ (variable v) (2)))",
+    );
+    // TODO: test parse errors
 }

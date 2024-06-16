@@ -1,7 +1,8 @@
 use crate::scanner;
+use itertools::Itertools;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoxError {
     pub line: usize,
     pub loc: String,
@@ -16,6 +17,21 @@ impl fmt::Display for LoxError {
             "[line {}] Error{}: {}",
             self.line, self.loc, self.message
         )
+    }
+}
+
+impl From<Vec<LoxError>> for LoxError {
+    fn from(value: Vec<LoxError>) -> Self {
+        let mut first = value[0].clone();
+        first.message = format!(
+            "{}\n{}",
+            first.message,
+            value[1..]
+                .into_iter()
+                .map(|err| format!("{}", err))
+                .join("\n")
+        );
+        first
     }
 }
 

@@ -126,6 +126,10 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         }
     }
 
+    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> Result<Object, LoxError> {
+        todo!()
+    }
+
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
         self.evaluate(&node.expr)?;
         // TODO: visitor with different return for stmts?
@@ -138,6 +142,10 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         (self.printer)(stringified);
         // TODO: visitor with different return for stmts?
         return Ok(Object::Nil);
+    }
+
+    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<Object, LoxError> {
+        todo!()
     }
 }
 

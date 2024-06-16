@@ -38,12 +38,21 @@ impl<'a> Visitor<'a, String> for AstPrinter {
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.right])
     }
+    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> String {
+        format!("(variable {})", node.name.lexeme)
+    }
 
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
         self.parenthesize("expr", vec![&node.expr])
     }
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> String {
         self.parenthesize("print", vec![&node.expr])
+    }
+    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> String {
+        match &node.initializer {
+            None => format!("(var {})", node.name.lexeme),
+            Some(init) => self.parenthesize(&format!("var {} =", node.name.lexeme), vec![&init]),
+        }
     }
 }
 

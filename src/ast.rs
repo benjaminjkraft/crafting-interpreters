@@ -10,12 +10,14 @@ pub enum Expr<'a> {
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
     Unary(UnaryExpr<'a>),
+    Variable(VariableExpr<'a>),
 }
 
 #[derive(Debug, From)]
 pub enum Stmt<'a> {
     Expr(ExprStmt<'a>),
     Print(PrintStmt<'a>),
+    Var(VarStmt<'a>),
 }
 
 #[derive(Debug)]
@@ -42,6 +44,11 @@ pub struct UnaryExpr<'a> {
 }
 
 #[derive(Debug)]
+pub struct VariableExpr<'a> {
+    pub name: scanner::Token<'a>,
+}
+
+#[derive(Debug)]
 pub struct ExprStmt<'a> {
     pub expr: Box<Expr<'a>>,
 }
@@ -49,6 +56,12 @@ pub struct ExprStmt<'a> {
 #[derive(Debug)]
 pub struct PrintStmt<'a> {
     pub expr: Box<Expr<'a>>,
+}
+
+#[derive(Debug)]
+pub struct VarStmt<'a> {
+    pub name: scanner::Token<'a>,
+    pub initializer: Option<Box<Expr<'a>>>,
 }
 
 macro_rules! visitor_impl {
@@ -72,8 +85,10 @@ visitor_impl!(BinaryExpr<'a>, visit_binary_expr);
 visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
 visitor_impl!(LiteralExpr, visit_literal_expr);
 visitor_impl!(UnaryExpr<'a>, visit_unary_expr);
+visitor_impl!(VariableExpr<'a>, visit_variable_expr);
 visitor_impl!(ExprStmt<'a>, visit_expr_stmt);
 visitor_impl!(PrintStmt<'a>, visit_print_stmt);
+visitor_impl!(VarStmt<'a>, visit_var_stmt);
 
 impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Expr<'a> {
     fn accept(&self, visitor: &mut V) -> R {
@@ -82,6 +97,7 @@ impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Expr<'a> {
             Expr::Grouping(e) => e.accept(visitor),
             Expr::Literal(e) => e.accept(visitor),
             Expr::Unary(e) => e.accept(visitor),
+            Expr::Variable(e) => e.accept(visitor),
         }
     }
 }
@@ -91,6 +107,7 @@ impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for Stmt<'a> {
         match self {
             Stmt::Expr(e) => e.accept(visitor),
             Stmt::Print(e) => e.accept(visitor),
+            Stmt::Var(e) => e.accept(visitor),
         }
     }
 }
@@ -106,6 +123,8 @@ pub trait Visitor<'a, R> {
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> R;
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> R;
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> R;
+    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> R;
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> R;
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> R;
+    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> R;
 }
