@@ -6,6 +6,7 @@ use std::process::ExitCode;
 
 mod ast;
 mod ast_printer;
+mod environment;
 mod error;
 mod interpreter;
 mod object;
@@ -14,9 +15,7 @@ mod scanner;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    let mut interpreter = interpreter::Interpreter {
-        printer: |s| println!("{}", s),
-    };
+    let mut interpreter = interpreter::interpreter();
     match args.len() {
         1 => {
             run_prompt(&mut interpreter);

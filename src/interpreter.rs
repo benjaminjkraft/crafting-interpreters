@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
 use crate::object::Object;
 use crate::parser;
@@ -6,7 +7,15 @@ use crate::scanner;
 use crate::scanner::TokenType;
 
 pub struct Interpreter<F: FnMut(String)> {
-    pub printer: F,
+    printer: F,
+    environment: Environment,
+}
+
+pub fn interpreter() -> Interpreter<impl FnMut(String)> {
+    Interpreter {
+        printer: |s| println!("{}", s),
+        environment: Environment::new(),
+    }
 }
 
 pub fn evaluate_source<F: FnMut(String)>(
@@ -127,7 +136,7 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
     }
 
     fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> Result<Object, LoxError> {
-        todo!()
+        return self.environment.get(&node.name);
     }
 
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
@@ -145,7 +154,14 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
     }
 
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<Object, LoxError> {
-        todo!()
+        let value = match &node.initializer {
+            Some(expr) => self.evaluate(&expr)?,
+            None => Object::Nil,
+        };
+
+        self.environment.define(node.name.lexeme, value);
+        // TODO: visitor with different return for stmts?
+        return Ok(Object::Nil);
     }
 }
 
@@ -154,6 +170,7 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let mut printed: Vec<String> = Vec::new();
     let mut interpreter = Interpreter {
         printer: |s| printed.push(s),
+        environment: Environment::new(),
     };
     evaluate_source(&mut interpreter, source)?;
     Ok(printed)
@@ -193,4 +210,7 @@ fn test_evaluate_expr() {
     assert_prints("print !nil;", Ok(vec!["true"]));
     assert_prints("print 1 + (2 + 3);", Ok(vec!["6"]));
     assert_prints(r#"print "a" + "b" + "c";"#, Ok(vec!["abc"]));
+    assert_prints("var v; print v;", Ok(vec!["nil"]));
+    assert_prints("var v = 3; print v;", Ok(vec!["3"]));
+    assert_prints("var v = 3; var v = 4; print v;", Ok(vec!["4"]));
 }
