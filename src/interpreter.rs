@@ -31,14 +31,6 @@ pub fn evaluate_source<F: FnMut(String)>(
 }
 
 impl<'a, F: FnMut(String)> Interpreter<F> {
-    fn execute(&mut self, stmt: &Stmt<'a>) -> Result<Object, LoxError> {
-        stmt.accept(self)
-    }
-
-    fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Object, LoxError> {
-        expr.accept(self)
-    }
-
     fn is_truthy(&mut self, obj: Object) -> bool {
         match obj {
             Object::Nil => false,
@@ -75,7 +67,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
     fn visit_program(&mut self, node: &Program<'a>) -> Result<Object, LoxError> {
         for stmt in node.stmts.iter() {
-            self.execute(&stmt)?;
+            self.visit_stmt(&stmt)?;
         }
 
         // TODO: visitor with different return for stmts?
@@ -83,15 +75,15 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
     }
 
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
-        let value = self.evaluate(&node.value)?;
+        let value = self.visit_expr(&node.value)?;
         self.environment
             .borrow_mut()
             .assign(&node.name, value.clone())?;
         Ok(value)
     }
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> Result<Object, LoxError> {
-        let left = self.evaluate(&node.left)?;
-        let right = self.evaluate(&node.right)?;
+        let left = self.visit_expr(&node.left)?;
+        let right = self.visit_expr(&node.right)?;
 
         match node.operator.type_ {
             TokenType::Minus => match (left, right) {
@@ -133,13 +125,13 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         }
     }
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> Result<Object, LoxError> {
-        return self.evaluate(&node.expr);
+        return self.visit_expr(&node.expr);
     }
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> Result<Object, LoxError> {
         return Ok(node.value.clone());
     }
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> Result<Object, LoxError> {
-        let right = self.evaluate(&node.right)?;
+        let right = self.visit_expr(&node.right)?;
 
         match node.operator.type_ {
             TokenType::Bang => Ok(Object::Bool(!self.is_truthy(right))),
@@ -159,20 +151,20 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         let prev = self.environment.clone();
         self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
         for stmt in &node.stmts {
-            self.execute(&stmt)?;
+            self.visit_stmt(&stmt)?;
         }
         self.environment = prev;
         Ok(Object::Nil)
     }
 
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
-        self.evaluate(&node.expr)?;
+        self.visit_expr(&node.expr)?;
         // TODO: visitor with different return for stmts?
         return Ok(Object::Nil);
     }
 
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<Object, LoxError> {
-        let value = self.evaluate(&node.expr)?;
+        let value = self.visit_expr(&node.expr)?;
         let stringified = self.stringify(value);
         (self.printer)(stringified);
         // TODO: visitor with different return for stmts?
@@ -181,7 +173,7 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
 
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<Object, LoxError> {
         let value = match &node.initializer {
-            Some(expr) => self.evaluate(&expr)?,
+            Some(expr) => self.visit_expr(&expr)?,
             None => Object::Nil,
         };
 

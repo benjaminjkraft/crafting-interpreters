@@ -1,4 +1,3 @@
-use crate::ast::Visited;
 use crate::ast::*;
 #[cfg(test)]
 use crate::parser;
@@ -17,7 +16,7 @@ impl<'a> AstPrinter {
             name,
             exprs
                 .into_iter()
-                .map(|e| format!(" {}", (*e).accept(self)))
+                .map(|e| format!(" {}", self.visit_expr(e)))
                 .join("")
         );
     }
@@ -25,7 +24,10 @@ impl<'a> AstPrinter {
 
 impl<'a> Visitor<'a, String> for AstPrinter {
     fn visit_program(&mut self, node: &Program<'a>) -> String {
-        node.stmts.iter().map(|stmt| stmt.accept(self)).join("\n")
+        node.stmts
+            .iter()
+            .map(|stmt| self.visit_stmt(stmt))
+            .join("\n")
     }
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> String {
         self.parenthesize(&format!("assign {}", node.name.lexeme), vec![&node.value])
@@ -51,7 +53,7 @@ impl<'a> Visitor<'a, String> for AstPrinter {
             "(block\n{})",
             node.stmts
                 .iter()
-                .map(|stmt| format!("\t{}\n", (*stmt).accept(self)))
+                .map(|stmt| format!("\t{}\n", self.visit_stmt(stmt)))
                 .join("")
         )
     }
