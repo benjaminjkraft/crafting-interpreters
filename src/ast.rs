@@ -2,7 +2,10 @@ use crate::object;
 use crate::scanner;
 use derive_more::From;
 
-pub type Program<'a> = Vec<Stmt<'a>>;
+#[derive(Debug)]
+pub struct Program<'a> {
+    pub stmts: Vec<Stmt<'a>>,
+}
 
 #[derive(Debug, From)]
 pub enum Expr<'a> {
@@ -94,6 +97,7 @@ macro_rules! visitor_impl {
     };
 }
 
+visitor_impl!(Program<'a>, visit_program);
 visitor_impl!(AssignExpr<'a>, visit_assign_expr);
 visitor_impl!(BinaryExpr<'a>, visit_binary_expr);
 visitor_impl!(GroupingExpr<'a>, visit_grouping_expr);
@@ -136,6 +140,7 @@ pub trait Visited<'a, R, V: Visitor<'a, R>> {
 
 #[allow(unused_variables)]
 pub trait Visitor<'a, R> {
+    fn visit_program(&mut self, node: &Program<'a>) -> R;
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> R;
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> R;
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> R;

@@ -7,9 +7,7 @@ use itertools::Itertools;
 struct AstPrinter {}
 
 pub fn print<'a>(prog: Program<'a>) -> String {
-    prog.into_iter()
-        .map(|stmt| stmt.accept(&mut AstPrinter {}))
-        .join("\n")
+    (AstPrinter {}).visit_program(&prog)
 }
 
 impl<'a> AstPrinter {
@@ -26,6 +24,9 @@ impl<'a> AstPrinter {
 }
 
 impl<'a> Visitor<'a, String> for AstPrinter {
+    fn visit_program(&mut self, node: &Program<'a>) -> String {
+        node.stmts.iter().map(|stmt| stmt.accept(self)).join("\n")
+    }
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> String {
         self.parenthesize(&format!("assign {}", node.name.lexeme), vec![&node.value])
     }

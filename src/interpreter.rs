@@ -26,9 +26,7 @@ pub fn evaluate_source<F: FnMut(String)>(
 ) -> Result<(), LoxError> {
     let tokens = scanner::scan_tokens(source)?;
     let prog = parser::parse(tokens)?;
-    for stmt in prog.iter() {
-        interpreter.execute(&stmt)?;
-    }
+    interpreter.visit_program(&prog)?;
     Ok(())
 }
 
@@ -82,6 +80,15 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 }
 
 impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
+    fn visit_program(&mut self, node: &Program<'a>) -> Result<Object, LoxError> {
+        for stmt in node.stmts.iter() {
+            self.execute(&stmt)?;
+        }
+
+        // TODO: visitor with different return for stmts?
+        return Ok(Object::Nil);
+    }
+
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
         let value = self.evaluate(&node.value)?;
         self.environment

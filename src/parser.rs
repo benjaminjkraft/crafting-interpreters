@@ -37,7 +37,9 @@ impl<'a> Parser<'a> {
         if errors.len() > 0 {
             Err(errors)
         } else {
-            Ok(declarations)
+            Ok(Program {
+                stmts: declarations,
+            })
         }
     }
 
