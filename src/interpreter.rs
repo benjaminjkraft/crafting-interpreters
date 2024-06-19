@@ -35,13 +35,6 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
         stmt.accept(self)
     }
 
-    fn execute_block(&mut self, stmts: &Vec<Stmt<'a>>) -> Result<Object, LoxError> {
-        for stmt in stmts {
-            self.execute(&stmt)?;
-        }
-        Ok(Object::Nil)
-    }
-
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Object, LoxError> {
         expr.accept(self)
     }
@@ -165,9 +158,11 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
     fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> Result<Object, LoxError> {
         let prev = self.environment.clone();
         self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
-        let result = self.execute_block(&node.stmts);
+        for stmt in &node.stmts {
+            self.execute(&stmt)?;
+        }
         self.environment = prev;
-        result
+        Ok(Object::Nil)
     }
 
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
