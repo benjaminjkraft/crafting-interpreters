@@ -69,6 +69,8 @@ impl<'a> Parser<'a> {
             self.block_statement()
         } else if self.match_(&[TokenType::If]) {
             self.if_statement()
+        } else if self.match_(&[TokenType::While]) {
+            self.while_statement()
         } else if self.match_(&[TokenType::Print]) {
             self.print_statement()
         } else {
@@ -103,6 +105,15 @@ impl<'a> Parser<'a> {
             else_,
         }
         .into())
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let condition = Box::new(self.expression()?);
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let body = Box::new(self.statement()?);
+        Ok(WhileStmt { condition, body }.into())
     }
 
     fn block_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
@@ -422,7 +433,7 @@ fn test_parser_blocks() {
 }
 
 #[test]
-fn test_parser_ifs() {
+fn test_parser_if() {
     assert_parses_to("if (true) 1;", "(if (true) (expr (1)))");
     assert_parses_to("if (true) 1; else 2;", "(if (true) (expr (1)) (expr (2)))");
     assert_parse_error(
@@ -445,4 +456,17 @@ fn test_parser_logical() {
         "1 and 2 or 3 and 4;",
         "(expr (or (and (1) (2)) (and (3) (4))))",
     )
+}
+
+#[test]
+fn test_parser_while() {
+    assert_parses_to("while (true) 1;", "(while (true) (expr (1)))");
+    assert_parse_error(
+        "while true 1;",
+        &["[line 1] Error at 'true': Expect '(' after 'while'."],
+    );
+    assert_parses_to(
+        "while (true) { 1; 2; }",
+        "(while (true) (block\n\t(expr (1))\n\t(expr (2))\n))",
+    );
 }

@@ -83,6 +83,14 @@ impl<'a> Visitor<'a, String, String> for AstPrinter {
         let start = format!("var {}", node.name.lexeme);
         self.parenthesize(&start, node.initializer.iter().collect())
     }
+    fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> String {
+        format!(
+            "({} {} {})",
+            "while",
+            self.visit_expr(&node.condition),
+            self.visit_stmt(&node.body),
+        )
+    }
 }
 
 #[test]

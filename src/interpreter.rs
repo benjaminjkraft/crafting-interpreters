@@ -200,6 +200,17 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxE
             .define(node.name.lexeme, value);
         Ok(())
     }
+
+    fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> Result<(), LoxError> {
+        loop {
+            let cond = self.visit_expr(&node.condition)?;
+            if !self.is_truthy(&cond) {
+                break;
+            }
+            self.visit_stmt(&node.body)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -335,5 +346,15 @@ fn test_evaluate_logical() {
     assert_prints(
         "var a; print (1 > 2) and (a = 1) or (a = 2); print a;",
         &["2", "2"],
+    );
+}
+
+#[test]
+fn test_evaluate_whiles() {
+    assert_prints("while (1 > 2) print 3;", &[]);
+    assert_prints("var a = 0; while (a < 1) { a = a + 1; print a; }", &["1"]);
+    assert_prints(
+        "var a = 0; while (a < 2) { a = a + 1; print a; }",
+        &["1", "2"],
     );
 }

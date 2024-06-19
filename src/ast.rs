@@ -25,6 +25,7 @@ pub enum Stmt<'a> {
     If(IfStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
+    While(WhileStmt<'a>),
 }
 
 #[derive(Debug)]
@@ -96,6 +97,12 @@ pub struct VarStmt<'a> {
     pub initializer: Option<Box<Expr<'a>>>,
 }
 
+#[derive(Debug)]
+pub struct WhileStmt<'a> {
+    pub condition: Box<Expr<'a>>,
+    pub body: Box<Stmt<'a>>,
+}
+
 #[allow(unused_variables)]
 pub trait Visitor<'a, RExpr, ROther> {
     fn visit_program(&mut self, node: &Program<'a>) -> ROther;
@@ -124,6 +131,7 @@ pub trait Visitor<'a, RExpr, ROther> {
             Stmt::If(n) => self.visit_if_stmt(n),
             Stmt::Print(n) => self.visit_print_stmt(n),
             Stmt::Var(n) => self.visit_var_stmt(n),
+            Stmt::While(n) => self.visit_while_stmt(n),
         }
     }
     fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> ROther;
@@ -131,4 +139,5 @@ pub trait Visitor<'a, RExpr, ROther> {
     fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> ROther;
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> ROther;
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> ROther;
+    fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> ROther;
 }
