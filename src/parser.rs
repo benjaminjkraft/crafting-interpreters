@@ -3,6 +3,7 @@ use crate::ast::*;
 use crate::ast_printer;
 use crate::error;
 use crate::error::LoxError;
+use crate::object::Object;
 #[cfg(test)]
 use crate::scanner;
 use crate::scanner::{Token, TokenType};
@@ -71,6 +72,8 @@ impl<'a> Parser<'a> {
             self.if_statement()
         } else if self.match_(&[TokenType::While]) {
             self.while_statement()
+        } else if self.match_(&[TokenType::For]) {
+            self.for_statement()
         } else if self.match_(&[TokenType::Print]) {
             self.print_statement()
         } else {
@@ -114,6 +117,67 @@ impl<'a> Parser<'a> {
 
         let body = Box::new(self.statement()?);
         Ok(WhileStmt { condition, body }.into())
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        let initializer = if self.match_(&[TokenType::Semicolon]) {
+            None
+        } else if self.match_(&[TokenType::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let condition = if self.check(TokenType::Semicolon) {
+            LiteralExpr {
+                value: Object::Bool(true),
+            }
+            .into()
+        } else {
+            self.expression()?
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+
+        let increment = if self.check(TokenType::RightParen) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(TokenType::RightParen, "Expect ')' after for clause.")?;
+
+        let body = self.statement()?;
+
+        let body_with_increment = match increment {
+            Some(expr) => BlockStmt {
+                stmts: vec![
+                    body,
+                    ExprStmt {
+                        expr: Box::new(expr),
+                    }
+                    .into(),
+                ],
+            }
+            .into(),
+            None => body,
+        };
+
+        let body_with_condition = WhileStmt {
+            condition: Box::new(condition),
+            body: Box::new(body_with_increment),
+        }
+        .into();
+
+        let body_with_initializer = match initializer {
+            Some(stmt) => BlockStmt {
+                stmts: vec![stmt, body_with_condition],
+            }
+            .into(),
+            None => body_with_condition,
+        };
+
+        Ok(body_with_initializer)
     }
 
     fn block_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
@@ -469,4 +533,30 @@ fn test_parser_while() {
         "while (true) { 1; 2; }",
         "(while (true) (block\n\t(expr (1))\n\t(expr (2))\n))",
     );
+}
+
+#[test]
+fn test_parser_for() {
+    assert_parses_to("for (;;) 1;", "(while (true) (expr (1)))");
+    assert_parses_to("for (;false;) 1;", "(while (false) (expr (1)))");
+    assert_parses_to("for (;i < 2;i = i + 1) 1;", "(while (< (variable i) (2)) (block\n\t(expr (1))\n\t(expr (assign i (+ (variable i) (1))))\n))");
+    assert_parses_to(
+        "for (var i = 0;false;) 1;",
+        "(block\n\t(var i (0))\n\t(while (false) (expr (1)))\n)",
+    );
+    assert_parses_to(
+        "for (i = 0;false;) 1;",
+        "(block\n\t(expr (assign i (0)))\n\t(while (false) (expr (1)))\n)",
+    );
+
+    assert_parse_error(
+        "for (;;;) 1;",
+        // TODO: disable synchronize inside of for loop conditions.
+        &[
+            "[line 1] Error at ';': Expect expression.",
+            "[line 1] Error at ')': Expect expression.",
+        ],
+    );
+    assert_parse_error("for (;) 1;", &["[line 1] Error at ')': Expect expression."]);
+    assert_parse_error("for () 1;", &["[line 1] Error at ')': Expect expression."]);
 }

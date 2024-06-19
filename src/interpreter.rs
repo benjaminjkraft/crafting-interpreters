@@ -358,3 +358,26 @@ fn test_evaluate_whiles() {
         &["1", "2"],
     );
 }
+
+#[test]
+fn test_evaluate_fors() {
+    assert_prints(
+        "for (var i = 0; i < 3; i = i + 1) { print i; }",
+        &["0", "1", "2"],
+    );
+    assert_prints(
+        r"
+            var a = 1;
+            var tmp;
+            for (var b = 1; a < 10000; b = tmp + b) {
+                print a;
+                tmp = a;
+                a = b;
+            }
+        ",
+        &[
+            "1", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144", "233", "377", "610",
+            "987", "1597", "2584", "4181", "6765",
+        ],
+    );
+}
