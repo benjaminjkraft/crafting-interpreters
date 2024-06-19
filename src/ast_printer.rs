@@ -2,6 +2,7 @@ use crate::ast::*;
 #[cfg(test)]
 use crate::parser;
 use itertools::Itertools;
+use std::fmt;
 
 struct AstPrinter {}
 
@@ -10,17 +11,8 @@ pub fn print<'a>(prog: Program<'a>) -> String {
     (AstPrinter {}).visit_program(&prog)
 }
 
-impl<'a> AstPrinter {
-    fn parenthesize(&mut self, name: &'a str, exprs: Vec<&Box<Expr<'a>>>) -> String {
-        format!(
-            "({}{})",
-            name,
-            exprs
-                .into_iter()
-                .map(|e| format!(" {}", self.visit_expr(e)))
-                .join("")
-        )
-    }
+fn parenthesize(items: impl IntoIterator<Item = impl fmt::Display>) -> String {
+    format!("({})", items.into_iter().join(" "))
 }
 
 impl<'a> Visitor<'a, String, String> for AstPrinter {
@@ -31,25 +23,33 @@ impl<'a> Visitor<'a, String, String> for AstPrinter {
             .join("\n")
     }
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> String {
-        self.parenthesize(&format!("assign {}", node.name.lexeme), vec![&node.value])
+        parenthesize(&["assign", node.name.lexeme, &self.visit_expr(&node.value)])
     }
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> String {
-        self.parenthesize(node.operator.lexeme, vec![&node.left, &node.right])
+        parenthesize(&[
+            node.operator.lexeme,
+            &self.visit_expr(&node.left),
+            &self.visit_expr(&node.right),
+        ])
     }
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> String {
-        self.parenthesize("group", vec![&node.expr])
+        parenthesize(&["group", &self.visit_expr(&node.expr)])
     }
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> String {
-        self.parenthesize(&node.value.to_string(), vec![])
+        parenthesize(&[&node.value.to_string()])
     }
     fn visit_logical_expr(&mut self, node: &LogicalExpr<'a>) -> String {
-        self.parenthesize(node.operator.lexeme, vec![&node.left, &node.right])
+        parenthesize(&[
+            node.operator.lexeme,
+            &self.visit_expr(&node.left),
+            &self.visit_expr(&node.right),
+        ])
     }
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
-        self.parenthesize(node.operator.lexeme, vec![&node.right])
+        parenthesize(&[node.operator.lexeme, &self.visit_expr(&node.right)])
     }
     fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> String {
-        format!("(variable {})", node.name.lexeme)
+        parenthesize(&["variable", node.name.lexeme])
     }
 
     fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> String {
@@ -62,34 +62,37 @@ impl<'a> Visitor<'a, String, String> for AstPrinter {
         )
     }
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
-        self.parenthesize("expr", vec![&node.expr])
+        parenthesize(&["expr", &self.visit_expr(&node.expr)])
     }
     fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> String {
-        format!(
-            "({} {} {}{})",
-            "if",
+        let mut parts = vec![
+            "if".to_string(),
             self.visit_expr(&node.condition),
             self.visit_stmt(&node.then_),
-            match &node.else_ {
-                Some(e) => format!(" {}", self.visit_stmt(e)),
-                None => "".to_string(),
-            },
-        )
+        ];
+        match &node.else_ {
+            Some(e) => parts.push(self.visit_stmt(e)),
+            None => {}
+        }
+        parenthesize(parts)
     }
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> String {
-        self.parenthesize("print", vec![&node.expr])
+        parenthesize(&["print", &self.visit_expr(&node.expr)])
     }
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> String {
-        let start = format!("var {}", node.name.lexeme);
-        self.parenthesize(&start, node.initializer.iter().collect())
+        let mut parts = vec!["var".to_string(), node.name.lexeme.to_string()];
+        match &node.initializer {
+            Some(e) => parts.push(self.visit_expr(e)),
+            None => {}
+        }
+        parenthesize(parts)
     }
     fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> String {
-        format!(
-            "({} {} {})",
+        parenthesize(&[
             "while",
-            self.visit_expr(&node.condition),
-            self.visit_stmt(&node.body),
-        )
+            &self.visit_expr(&node.condition),
+            &self.visit_stmt(&node.body),
+        ])
     }
 }
 
