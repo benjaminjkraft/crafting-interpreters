@@ -81,14 +81,14 @@ pub struct VarStmt<'a> {
 }
 
 macro_rules! visitor_impl {
-    ( $type:ident < $lt:lifetime >, $method:ident  ) => {
+    ( $type:ident < $lt:lifetime >, $method:ident ) => {
         impl<$lt, R, V: Visitor<$lt, R>> Visited<$lt, R, V> for $type<$lt> {
             fn accept(&self, visitor: &mut V) -> R {
                 visitor.$method(&self)
             }
         }
     };
-    ( $type:ident, $method:ident  ) => {
+    ( $type:ident, $method:ident ) => {
         impl<'a, R, V: Visitor<'a, R>> Visited<'a, R, V> for $type {
             fn accept(&self, visitor: &mut V) -> R {
                 visitor.$method(&self)

@@ -274,6 +274,10 @@ fn test_evaluate_expr() {
     );
     assert_prints("var a = 1; { a = 2; } print a;", vec!["2"]);
     assert_prints(
+        "var a = 1; { var a = a + 2; print a; } print a;",
+        vec!["3", "1"],
+    );
+    assert_prints(
         r#"
             var a = "global a";
             var b = "global b";
