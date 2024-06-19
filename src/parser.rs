@@ -67,6 +67,8 @@ impl<'a> Parser<'a> {
     fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
         if self.match_(&vec![TokenType::LeftBrace]) {
             self.block_statement()
+        } else if self.match_(&vec![TokenType::If]) {
+            self.if_statement()
         } else if self.match_(&vec![TokenType::Print]) {
             self.print_statement()
         } else {
@@ -79,6 +81,26 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(PrintStmt {
             expr: Box::new(value),
+        }
+        .into())
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        let condition = Box::new(self.expression()?);
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let then_ = Box::new(self.statement()?);
+        let else_ = if self.match_(&vec![TokenType::Else]) {
+            Some(Box::new(self.statement()?))
+        } else {
+            None
+        };
+
+        Ok(IfStmt {
+            condition,
+            then_,
+            else_,
         }
         .into())
     }
@@ -358,5 +380,19 @@ fn test_parser() {
     assert_parses_to(
         "{ var v; var w; print v + w; }",
         "(block\n\t(var v)\n\t(var w)\n\t(print (+ (variable v) (variable w)))\n)",
+    );
+    assert_parses_to("if (true) 1;", "(if (true) (expr (1)))");
+    assert_parses_to("if (true) 1; else 2;", "(if (true) (expr (1)) (expr (2)))");
+    assert_parse_error(
+        "if true 1;",
+        &["[line 1] Error at 'true': Expect '(' after 'if'."],
+    );
+    assert_parses_to(
+        "if (true) { 1; 2; } else { 3; 4; }",
+        "(if (true) (block\n\t(expr (1))\n\t(expr (2))\n) (block\n\t(expr (3))\n\t(expr (4))\n))",
+    );
+    assert_parses_to(
+        "if (1) if (2) 3; else 4;",
+        "(if (1) (if (2) (expr (3)) (expr (4))))",
     );
 }

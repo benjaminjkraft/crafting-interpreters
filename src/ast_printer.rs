@@ -61,6 +61,18 @@ impl<'a> Visitor<'a, String, String> for AstPrinter {
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
         self.parenthesize("expr", vec![&node.expr])
     }
+    fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> String {
+        format!(
+            "({} {} {}{})",
+            "if",
+            self.visit_expr(&node.condition),
+            self.visit_stmt(&node.then_),
+            match &node.else_ {
+                Some(e) => format!(" {}", self.visit_stmt(e)),
+                None => "".to_string(),
+            },
+        )
+    }
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> String {
         self.parenthesize("print", vec![&node.expr])
     }

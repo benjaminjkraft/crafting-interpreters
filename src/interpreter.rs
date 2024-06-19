@@ -162,6 +162,18 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxE
         Ok(())
     }
 
+    fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> Result<(), LoxError> {
+        let cond = self.visit_expr(&node.condition)?;
+        if self.is_truthy(cond) {
+            self.visit_stmt(&node.then_)
+        } else {
+            match &node.else_ {
+                Some(e) => self.visit_stmt(e),
+                None => Ok(()),
+            }
+        }
+    }
+
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<(), LoxError> {
         let value = self.visit_expr(&node.expr)?;
         let stringified = self.stringify(value);
@@ -288,4 +300,8 @@ fn test_evaluate_expr() {
             "global b", "global c",
         ],
     );
+    assert_prints("if (1 < 2) print 3; else print 4;", vec!["3"]);
+    assert_prints("if (1 > 2) print 3; else print 4;", vec!["4"]);
+    assert_prints("if (1 < 2) print 3;", vec!["3"]);
+    assert_prints("if (1 > 2) print 3;", vec![]);
 }

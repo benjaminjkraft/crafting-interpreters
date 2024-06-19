@@ -21,6 +21,7 @@ pub enum Expr<'a> {
 pub enum Stmt<'a> {
     Block(BlockStmt<'a>),
     Expr(ExprStmt<'a>),
+    If(IfStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
 }
@@ -70,6 +71,13 @@ pub struct ExprStmt<'a> {
 }
 
 #[derive(Debug)]
+pub struct IfStmt<'a> {
+    pub condition: Box<Expr<'a>>,
+    pub then_: Box<Stmt<'a>>,
+    pub else_: Option<Box<Stmt<'a>>>,
+}
+
+#[derive(Debug)]
 pub struct PrintStmt<'a> {
     pub expr: Box<Expr<'a>>,
 }
@@ -103,12 +111,14 @@ pub trait Visitor<'a, RExpr, ROther> {
         match node {
             Stmt::Block(n) => self.visit_block_stmt(n),
             Stmt::Expr(n) => self.visit_expr_stmt(n),
+            Stmt::If(n) => self.visit_if_stmt(n),
             Stmt::Print(n) => self.visit_print_stmt(n),
             Stmt::Var(n) => self.visit_var_stmt(n),
         }
     }
     fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> ROther;
     fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> ROther;
+    fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> ROther;
     fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> ROther;
     fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> ROther;
 }
