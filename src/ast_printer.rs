@@ -22,7 +22,7 @@ impl<'a> AstPrinter {
     }
 }
 
-impl<'a> Visitor<'a, String> for AstPrinter {
+impl<'a> Visitor<'a, String, String> for AstPrinter {
     fn visit_program(&mut self, node: &Program<'a>) -> String {
         node.stmts
             .iter()

@@ -64,14 +64,14 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
     }
 }
 
-impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter<F> {
-    fn visit_program(&mut self, node: &Program<'a>) -> Result<Object, LoxError> {
+impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxError>>
+    for Interpreter<F>
+{
+    fn visit_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
         for stmt in node.stmts.iter() {
             self.visit_stmt(&stmt)?;
         }
-
-        // TODO: visitor with different return for stmts?
-        return Ok(Object::Nil);
+        Ok(())
     }
 
     fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
@@ -147,31 +147,29 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         self.environment.borrow().get(&node.name)
     }
 
-    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> Result<Object, LoxError> {
+    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> Result<(), LoxError> {
         let prev = self.environment.clone();
         self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
         for stmt in &node.stmts {
             self.visit_stmt(&stmt)?;
         }
         self.environment = prev;
-        Ok(Object::Nil)
+        Ok(())
     }
 
-    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<Object, LoxError> {
+    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<(), LoxError> {
         self.visit_expr(&node.expr)?;
-        // TODO: visitor with different return for stmts?
-        return Ok(Object::Nil);
+        Ok(())
     }
 
-    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<Object, LoxError> {
+    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<(), LoxError> {
         let value = self.visit_expr(&node.expr)?;
         let stringified = self.stringify(value);
         (self.printer)(stringified);
-        // TODO: visitor with different return for stmts?
-        return Ok(Object::Nil);
+        Ok(())
     }
 
-    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<Object, LoxError> {
+    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<(), LoxError> {
         let value = match &node.initializer {
             Some(expr) => self.visit_expr(&expr)?,
             None => Object::Nil,
@@ -180,8 +178,7 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>> for Interpreter
         self.environment
             .borrow_mut()
             .define(node.name.lexeme, value);
-        // TODO: visitor with different return for stmts?
-        return Ok(Object::Nil);
+        Ok(())
     }
 }
 

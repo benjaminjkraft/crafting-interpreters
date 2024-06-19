@@ -81,9 +81,9 @@ pub struct VarStmt<'a> {
 }
 
 #[allow(unused_variables)]
-pub trait Visitor<'a, R> {
-    fn visit_program(&mut self, node: &Program<'a>) -> R;
-    fn visit_expr(&mut self, node: &Expr<'a>) -> R {
+pub trait Visitor<'a, RExpr, ROther> {
+    fn visit_program(&mut self, node: &Program<'a>) -> ROther;
+    fn visit_expr(&mut self, node: &Expr<'a>) -> RExpr {
         match node {
             Expr::Assign(n) => self.visit_assign_expr(n),
             Expr::Binary(n) => self.visit_binary_expr(n),
@@ -93,13 +93,13 @@ pub trait Visitor<'a, R> {
             Expr::Variable(n) => self.visit_variable_expr(n),
         }
     }
-    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> R;
-    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> R;
-    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> R;
-    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> R;
-    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> R;
-    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> R;
-    fn visit_stmt(&mut self, node: &Stmt<'a>) -> R {
+    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> RExpr;
+    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> RExpr;
+    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> RExpr;
+    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> RExpr;
+    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> RExpr;
+    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> RExpr;
+    fn visit_stmt(&mut self, node: &Stmt<'a>) -> ROther {
         match node {
             Stmt::Block(n) => self.visit_block_stmt(n),
             Stmt::Expr(n) => self.visit_expr_stmt(n),
@@ -107,8 +107,8 @@ pub trait Visitor<'a, R> {
             Stmt::Var(n) => self.visit_var_stmt(n),
         }
     }
-    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> R;
-    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> R;
-    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> R;
-    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> R;
+    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> ROther;
+    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> ROther;
+    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> ROther;
+    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> ROther;
 }
