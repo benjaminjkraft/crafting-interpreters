@@ -31,10 +31,10 @@ pub fn evaluate_source<F: FnMut(String)>(
 }
 
 impl<'a, F: FnMut(String)> Interpreter<F> {
-    fn is_truthy(&mut self, obj: Object) -> bool {
-        match obj {
+    fn is_truthy(&mut self, obj: &Object) -> bool {
+        match &obj {
             Object::Nil => false,
-            Object::Bool(b) => b,
+            Object::Bool(b) => *b,
             _ => true,
         }
     }
@@ -130,11 +130,19 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxE
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> Result<Object, LoxError> {
         Ok(node.value.clone())
     }
+    fn visit_logical_expr(&mut self, node: &LogicalExpr) -> Result<Object, LoxError> {
+        let left = self.visit_expr(&node.left)?;
+        match (node.operator.type_, self.is_truthy(&left)) {
+            (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
+            (TokenType::Or, false) | (TokenType::And, true) => self.visit_expr(&node.right),
+            _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+        }
+    }
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> Result<Object, LoxError> {
         let right = self.visit_expr(&node.right)?;
 
         match node.operator.type_ {
-            TokenType::Bang => Ok(Object::Bool(!self.is_truthy(right))),
+            TokenType::Bang => Ok(Object::Bool(!self.is_truthy(&right))),
             TokenType::Minus => match right {
                 Object::Number(n) => Ok(Object::Number(-n)),
                 _ => runtime_error(&node.operator, "invalid type for negation"),
@@ -164,7 +172,7 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxE
 
     fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> Result<(), LoxError> {
         let cond = self.visit_expr(&node.condition)?;
-        if self.is_truthy(cond) {
+        if self.is_truthy(&cond) {
             self.visit_stmt(&node.then_)
         } else {
             match &node.else_ {
@@ -225,7 +233,7 @@ fn assert_errs(source: &str, expected: &str) {
 }
 
 #[test]
-fn test_evaluate_expr() {
+fn test_evaluate_simple_expr() {
     assert_prints("print 1 + 2;", &["3"]);
     assert_prints("print 1 == 1;", &["true"]);
     assert_prints("print 1 == true;", &["false"]);
@@ -247,6 +255,10 @@ fn test_evaluate_expr() {
     assert_prints("print !nil;", &["true"]);
     assert_prints("print 1 + (2 + 3);", &["6"]);
     assert_prints(r#"print "a" + "b" + "c";"#, &["abc"]);
+}
+
+#[test]
+fn test_evaluate_vars() {
     assert_prints("var v; print v;", &["nil"]);
     assert_prints("var v = 3; print v;", &["3"]);
     assert_prints("var v = 3; var v = 4; print v;", &["4"]);
@@ -255,6 +267,10 @@ fn test_evaluate_expr() {
     assert_prints("var v = 3; v = v + 1; print v;", &["4"]);
     assert_prints("var v = 3; v = (v = v + 1) + 1; print v;", &["5"]);
     assert_errs("v = 3;", "[line 1] Error: Undefined variable 'v'.");
+}
+
+#[test]
+fn test_evaluate_blocks() {
     assert_prints("{}", &[]);
     assert_prints("var a = 1; { var a = 2; print a; } print a;", &["2", "1"]);
     assert_prints(
@@ -297,8 +313,27 @@ fn test_evaluate_expr() {
             "global b", "global c",
         ],
     );
+}
+
+#[test]
+fn test_evaluate_ifs() {
     assert_prints("if (1 < 2) print 3; else print 4;", &["3"]);
     assert_prints("if (1 > 2) print 3; else print 4;", &["4"]);
     assert_prints("if (1 < 2) print 3;", &["3"]);
     assert_prints("if (1 > 2) print 3;", &[]);
+}
+
+#[test]
+fn test_evaluate_logical() {
+    assert_prints("print (1 < 2) and (3 < 4) or (2 < 1);", &["true"]);
+    assert_prints("print (1 > 2) and (3 < 4) or (2 > 1);", &["true"]);
+    assert_prints("print (1 > 2) and (3 < 4) or (2 < 1);", &["false"]);
+    assert_prints(
+        "var a; print (1 < 2) and (a = 1) or (a = 2); print a;",
+        &["1", "1"],
+    );
+    assert_prints(
+        "var a; print (1 > 2) and (a = 1) or (a = 2); print a;",
+        &["2", "2"],
+    );
 }

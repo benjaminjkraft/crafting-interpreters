@@ -42,6 +42,9 @@ impl<'a> Visitor<'a, String, String> for AstPrinter {
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> String {
         self.parenthesize(&node.value.to_string(), vec![])
     }
+    fn visit_logical_expr(&mut self, node: &LogicalExpr<'a>) -> String {
+        self.parenthesize(node.operator.lexeme, vec![&node.left, &node.right])
+    }
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
         self.parenthesize(node.operator.lexeme, vec![&node.right])
     }

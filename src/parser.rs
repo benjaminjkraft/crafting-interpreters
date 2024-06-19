@@ -148,7 +148,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self) -> Result<Expr<'a>, LoxError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if self.match_(&[TokenType::Equal]) {
             let var = match expr {
                 Expr::Variable(v) => Ok(v),
@@ -166,6 +166,36 @@ impl<'a> Parser<'a> {
         } else {
             Ok(expr)
         }
+    }
+
+    fn or(&mut self) -> Result<Expr<'a>, LoxError> {
+        let mut expr = self.and()?;
+        while self.match_(&[TokenType::Or]) {
+            let operator = self.previous();
+            let right = self.and()?;
+            expr = LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+            .into();
+        }
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr<'a>, LoxError> {
+        let mut expr = self.equality()?;
+        while self.match_(&[TokenType::And]) {
+            let operator = self.previous();
+            let right = self.equality()?;
+            expr = LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+            .into();
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr<'a>, LoxError> {
@@ -336,7 +366,7 @@ fn assert_parse_error(input: &str, messages: &[&str]) {
 }
 
 #[test]
-fn test_parser() {
+fn test_parser_simple_exprs() {
     assert_parses_to("1+2;", "(expr (+ (1) (2)))");
     assert_parse_error("1+2", &["[line 1] Error at end: Expect ';' after value."]);
     assert_parse_error("1+;", &["[line 1] Error at ';': Expect expression."]);
@@ -352,6 +382,10 @@ fn test_parser() {
     assert_parses_to("1.2 + \"four\";", "(expr (+ (1.2) (four)))");
     assert_parses_to("print 1+2;", "(print (+ (1) (2)))");
     assert_parses_to("1+2;print 1+2;", "(expr (+ (1) (2)))\n(print (+ (1) (2)))");
+}
+
+#[test]
+fn test_parser_vars() {
     assert_parses_to(
         "var v = 1; v+2;",
         "(var v (1))\n(expr (+ (variable v) (2)))",
@@ -368,6 +402,10 @@ fn test_parser() {
         "var v; var w; v = w = 3;",
         "(var v)\n(var w)\n(expr (assign v (assign w (3))))",
     );
+}
+
+#[test]
+fn test_parser_blocks() {
     assert_parses_to("{}", "(block\n)");
     assert_parse_error("{", &["[line 1] Error at end: Expect '}' after block."]);
     assert_parse_error(
@@ -381,6 +419,10 @@ fn test_parser() {
         "{ var v; var w; print v + w; }",
         "(block\n\t(var v)\n\t(var w)\n\t(print (+ (variable v) (variable w)))\n)",
     );
+}
+
+#[test]
+fn test_parser_ifs() {
     assert_parses_to("if (true) 1;", "(if (true) (expr (1)))");
     assert_parses_to("if (true) 1; else 2;", "(if (true) (expr (1)) (expr (2)))");
     assert_parse_error(
@@ -395,4 +437,12 @@ fn test_parser() {
         "if (1) if (2) 3; else 4;",
         "(if (1) (if (2) (expr (3)) (expr (4))))",
     );
+}
+
+#[test]
+fn test_parser_logical() {
+    assert_parses_to(
+        "1 and 2 or 3 and 4;",
+        "(expr (or (and (1) (2)) (and (3) (4))))",
+    )
 }

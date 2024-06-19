@@ -13,6 +13,7 @@ pub enum Expr<'a> {
     Binary(BinaryExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
+    Logical(LogicalExpr<'a>),
     Unary(UnaryExpr<'a>),
     Variable(VariableExpr<'a>),
 }
@@ -47,6 +48,13 @@ pub struct GroupingExpr<'a> {
 #[derive(Debug)]
 pub struct LiteralExpr {
     pub value: object::Object,
+}
+
+#[derive(Debug)]
+pub struct LogicalExpr<'a> {
+    pub left: Box<Expr<'a>>,
+    pub operator: scanner::Token<'a>,
+    pub right: Box<Expr<'a>>,
 }
 
 #[derive(Debug)]
@@ -97,6 +105,7 @@ pub trait Visitor<'a, RExpr, ROther> {
             Expr::Binary(n) => self.visit_binary_expr(n),
             Expr::Grouping(n) => self.visit_grouping_expr(n),
             Expr::Literal(n) => self.visit_literal_expr(n),
+            Expr::Logical(n) => self.visit_logical_expr(n),
             Expr::Unary(n) => self.visit_unary_expr(n),
             Expr::Variable(n) => self.visit_variable_expr(n),
         }
@@ -105,6 +114,7 @@ pub trait Visitor<'a, RExpr, ROther> {
     fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> RExpr;
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> RExpr;
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> RExpr;
+    fn visit_logical_expr(&mut self, node: &LogicalExpr<'a>) -> RExpr;
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> RExpr;
     fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> RExpr;
     fn visit_stmt(&mut self, node: &Stmt<'a>) -> ROther {
