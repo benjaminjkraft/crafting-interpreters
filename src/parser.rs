@@ -15,8 +15,7 @@ struct Parser<'a> {
 }
 
 pub fn parse<'a>(tokens: Vec<Token<'a>>) -> Result<Program<'a>, Vec<LoxError>> {
-    let mut parser = Parser { tokens, current: 0 };
-    return parser.program();
+    (Parser { tokens, current: 0 }).program()
 }
 
 impl<'a> Parser<'a> {
@@ -62,7 +61,7 @@ impl<'a> Parser<'a> {
             TokenType::Semicolon,
             "Expect ';' after variable declaration.",
         )?;
-        return Ok(VarStmt { name, initializer }.into());
+        Ok(VarStmt { name, initializer }.into())
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
@@ -234,10 +233,10 @@ impl<'a> Parser<'a> {
 
     fn consume(&mut self, type_: TokenType, message: &str) -> Result<Token<'a>, LoxError> {
         if self.check(type_) {
-            return Ok(self.advance());
+            Ok(self.advance())
+        } else {
+            Err(error::parse_error(self.peek(), message))
         }
-
-        return Err(error::parse_error(self.peek(), message));
     }
 
     fn synchronize(&mut self) {
@@ -265,10 +264,7 @@ impl<'a> Parser<'a> {
     }
 
     fn check(&self, type_: TokenType) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-        return self.peek().type_ == type_;
+        !self.is_at_end() && self.peek().type_ == type_
     }
 
     fn advance(&mut self) -> Token<'a> {

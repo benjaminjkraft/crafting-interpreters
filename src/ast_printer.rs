@@ -5,20 +5,21 @@ use itertools::Itertools;
 
 struct AstPrinter {}
 
+#[allow(dead_code)]
 pub fn print<'a>(prog: Program<'a>) -> String {
     (AstPrinter {}).visit_program(&prog)
 }
 
 impl<'a> AstPrinter {
     fn parenthesize(&mut self, name: &'a str, exprs: Vec<&Box<Expr<'a>>>) -> String {
-        return format!(
+        format!(
             "({}{})",
             name,
             exprs
                 .into_iter()
                 .map(|e| format!(" {}", self.visit_expr(e)))
                 .join("")
-        );
+        )
     }
 }
 

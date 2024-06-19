@@ -125,10 +125,10 @@ impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxE
         }
     }
     fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> Result<Object, LoxError> {
-        return self.visit_expr(&node.expr);
+        self.visit_expr(&node.expr)
     }
     fn visit_literal_expr(&mut self, node: &LiteralExpr) -> Result<Object, LoxError> {
-        return Ok(node.value.clone());
+        Ok(node.value.clone())
     }
     fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> Result<Object, LoxError> {
         let right = self.visit_expr(&node.right)?;
