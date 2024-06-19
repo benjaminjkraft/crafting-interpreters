@@ -206,7 +206,7 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
 }
 
 #[cfg(test)]
-fn assert_prints(source: &str, expected: Vec<&str>) {
+fn assert_prints(source: &str, expected: &[&str]) {
     match execute_for_tests(source) {
         Ok(a) => assert_eq!(
             a,
@@ -226,14 +226,14 @@ fn assert_errs(source: &str, expected: &str) {
 
 #[test]
 fn test_evaluate_expr() {
-    assert_prints("print 1 + 2;", vec!["3"]);
-    assert_prints("print 1 == 1;", vec!["true"]);
-    assert_prints("print 1 == true;", vec!["false"]);
-    assert_prints("print 1/0 == 1/0;", vec!["true"]);
-    assert_prints("print 0/0 == 0/0;", vec!["false"]);
-    assert_prints("print false == nil;", vec!["false"]);
-    assert_prints("print 1 >= 1;", vec!["true"]);
-    assert_prints("print 1 > 1;", vec!["false"]);
+    assert_prints("print 1 + 2;", &["3"]);
+    assert_prints("print 1 == 1;", &["true"]);
+    assert_prints("print 1 == true;", &["false"]);
+    assert_prints("print 1/0 == 1/0;", &["true"]);
+    assert_prints("print 0/0 == 0/0;", &["false"]);
+    assert_prints("print false == nil;", &["false"]);
+    assert_prints("print 1 >= 1;", &["true"]);
+    assert_prints("print 1 > 1;", &["false"]);
     assert_errs(
         "print true > false;",
         "[line 1] Error: invalid types for comparison",
@@ -242,36 +242,33 @@ fn test_evaluate_expr() {
         r#"print 1 + "a";"#,
         "[line 1] Error: invalid types for addition",
     );
-    assert_prints(r#"print "a" + "b";"#, vec!["ab"]);
-    assert_prints("print !true;", vec!["false"]);
-    assert_prints("print !nil;", vec!["true"]);
-    assert_prints("print 1 + (2 + 3);", vec!["6"]);
-    assert_prints(r#"print "a" + "b" + "c";"#, vec!["abc"]);
-    assert_prints("var v; print v;", vec!["nil"]);
-    assert_prints("var v = 3; print v;", vec!["3"]);
-    assert_prints("var v = 3; var v = 4; print v;", vec!["4"]);
-    assert_prints("var v = 3; v = 4; print v;", vec!["4"]);
-    assert_prints("var v; var w; v = w = 4; print v; print w;", vec!["4", "4"]);
-    assert_prints("var v = 3; v = v + 1; print v;", vec!["4"]);
-    assert_prints("var v = 3; v = (v = v + 1) + 1; print v;", vec!["5"]);
+    assert_prints(r#"print "a" + "b";"#, &["ab"]);
+    assert_prints("print !true;", &["false"]);
+    assert_prints("print !nil;", &["true"]);
+    assert_prints("print 1 + (2 + 3);", &["6"]);
+    assert_prints(r#"print "a" + "b" + "c";"#, &["abc"]);
+    assert_prints("var v; print v;", &["nil"]);
+    assert_prints("var v = 3; print v;", &["3"]);
+    assert_prints("var v = 3; var v = 4; print v;", &["4"]);
+    assert_prints("var v = 3; v = 4; print v;", &["4"]);
+    assert_prints("var v; var w; v = w = 4; print v; print w;", &["4", "4"]);
+    assert_prints("var v = 3; v = v + 1; print v;", &["4"]);
+    assert_prints("var v = 3; v = (v = v + 1) + 1; print v;", &["5"]);
     assert_errs("v = 3;", "[line 1] Error: Undefined variable 'v'.");
-    assert_prints("{}", vec![]);
-    assert_prints(
-        "var a = 1; { var a = 2; print a; } print a;",
-        vec!["2", "1"],
-    );
+    assert_prints("{}", &[]);
+    assert_prints("var a = 1; { var a = 2; print a; } print a;", &["2", "1"]);
     assert_prints(
         "var a = 1; { var b = 2; print a; print b; } print a;",
-        vec!["1", "2", "1"],
+        &["1", "2", "1"],
     );
     assert_errs(
         "var a = 1; { var b = 2; } print b;",
         "[line 1] Error: Undefined variable 'b'.",
     );
-    assert_prints("var a = 1; { a = 2; } print a;", vec!["2"]);
+    assert_prints("var a = 1; { a = 2; } print a;", &["2"]);
     assert_prints(
         "var a = 1; { var a = a + 2; print a; } print a;",
-        vec!["3", "1"],
+        &["3", "1"],
     );
     assert_prints(
         r#"
@@ -295,13 +292,13 @@ fn test_evaluate_expr() {
             print b;
             print c;
         "#,
-        vec![
+        &[
             "inner a", "outer b", "global c", "outer a", "outer b", "global c", "global a",
             "global b", "global c",
         ],
     );
-    assert_prints("if (1 < 2) print 3; else print 4;", vec!["3"]);
-    assert_prints("if (1 > 2) print 3; else print 4;", vec!["4"]);
-    assert_prints("if (1 < 2) print 3;", vec!["3"]);
-    assert_prints("if (1 > 2) print 3;", vec![]);
+    assert_prints("if (1 < 2) print 3; else print 4;", &["3"]);
+    assert_prints("if (1 > 2) print 3; else print 4;", &["4"]);
+    assert_prints("if (1 < 2) print 3;", &["3"]);
+    assert_prints("if (1 > 2) print 3;", &[]);
 }

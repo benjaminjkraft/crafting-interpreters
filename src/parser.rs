@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) -> Result<Stmt<'a>, LoxError> {
-        if self.match_(&vec![TokenType::Var]) {
+        if self.match_(&[TokenType::Var]) {
             self.var_declaration()
         } else {
             self.statement()
@@ -52,7 +52,7 @@ impl<'a> Parser<'a> {
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, LoxError> {
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
-        let initializer = if self.match_(&vec![TokenType::Equal]) {
+        let initializer = if self.match_(&[TokenType::Equal]) {
             Some(Box::new(self.expression()?))
         } else {
             None
@@ -65,11 +65,11 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, LoxError> {
-        if self.match_(&vec![TokenType::LeftBrace]) {
+        if self.match_(&[TokenType::LeftBrace]) {
             self.block_statement()
-        } else if self.match_(&vec![TokenType::If]) {
+        } else if self.match_(&[TokenType::If]) {
             self.if_statement()
-        } else if self.match_(&vec![TokenType::Print]) {
+        } else if self.match_(&[TokenType::Print]) {
             self.print_statement()
         } else {
             self.expression_statement()
@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
 
         let then_ = Box::new(self.statement()?);
-        let else_ = if self.match_(&vec![TokenType::Else]) {
+        let else_ = if self.match_(&[TokenType::Else]) {
             Some(Box::new(self.statement()?))
         } else {
             None
@@ -129,7 +129,7 @@ impl<'a> Parser<'a> {
 
     fn binary_expression(
         &mut self,
-        tokens: Vec<TokenType>,
+        tokens: &[TokenType],
         next: &mut dyn FnMut(&mut Self) -> Result<Expr<'a>, LoxError>,
     ) -> Result<Expr<'a>, LoxError> {
         let mut expr = next(self)?;
@@ -149,7 +149,7 @@ impl<'a> Parser<'a> {
 
     fn assignment(&mut self) -> Result<Expr<'a>, LoxError> {
         let expr = self.equality()?;
-        if self.match_(&vec![TokenType::Equal]) {
+        if self.match_(&[TokenType::Equal]) {
             let var = match expr {
                 Expr::Variable(v) => Ok(v),
                 _ => Err(error::parse_error(
@@ -170,14 +170,14 @@ impl<'a> Parser<'a> {
 
     fn equality(&mut self) -> Result<Expr<'a>, LoxError> {
         self.binary_expression(
-            vec![TokenType::BangEqual, TokenType::EqualEqual],
+            &[TokenType::BangEqual, TokenType::EqualEqual],
             &mut |self_| self_.comparison(),
         )
     }
 
     fn comparison(&mut self) -> Result<Expr<'a>, LoxError> {
         self.binary_expression(
-            vec![
+            &[
                 TokenType::Greater,
                 TokenType::GreaterEqual,
                 TokenType::Less,
@@ -188,19 +188,19 @@ impl<'a> Parser<'a> {
     }
 
     fn term(&mut self) -> Result<Expr<'a>, LoxError> {
-        self.binary_expression(vec![TokenType::Minus, TokenType::Plus], &mut |self_| {
+        self.binary_expression(&[TokenType::Minus, TokenType::Plus], &mut |self_| {
             self_.factor()
         })
     }
 
     fn factor(&mut self) -> Result<Expr<'a>, LoxError> {
-        self.binary_expression(vec![TokenType::Slash, TokenType::Star], &mut |self_| {
+        self.binary_expression(&[TokenType::Slash, TokenType::Star], &mut |self_| {
             self_.unary()
         })
     }
 
     fn unary(&mut self) -> Result<Expr<'a>, LoxError> {
-        if self.match_(&vec![TokenType::Bang, TokenType::Minus]) {
+        if self.match_(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
             return Ok(UnaryExpr {
@@ -214,7 +214,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, LoxError> {
-        if self.match_(&vec![
+        if self.match_(&[
             TokenType::False,
             TokenType::True,
             TokenType::Nil,
@@ -225,12 +225,12 @@ impl<'a> Parser<'a> {
                 value: self.previous().literal,
             }
             .into())
-        } else if self.match_(&vec![TokenType::Identifier]) {
+        } else if self.match_(&[TokenType::Identifier]) {
             Ok(VariableExpr {
                 name: self.previous(),
             }
             .into())
-        } else if self.match_(&vec![TokenType::LeftParen]) {
+        } else if self.match_(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
             Ok(GroupingExpr {
@@ -242,7 +242,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn match_(&mut self, types: &Vec<TokenType>) -> bool {
+    fn match_(&mut self, types: &[TokenType]) -> bool {
         types.into_iter().any(|type_| {
             if self.check(*type_) {
                 self.advance();
