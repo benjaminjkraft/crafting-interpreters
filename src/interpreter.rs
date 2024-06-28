@@ -26,7 +26,7 @@ pub fn evaluate_source<F: FnMut(String)>(
 ) -> Result<(), LoxError> {
     let tokens = scanner::scan_tokens(source)?;
     let prog = parser::parse(tokens)?;
-    interpreter.visit_program(&prog)?;
+    interpreter.execute_program(&prog)?;
     Ok(())
 }
 
@@ -62,152 +62,140 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
             Object::Number(n) => n.to_string(),
         }
     }
-}
 
-impl<'a, F: FnMut(String)> Visitor<'a, Result<Object, LoxError>, Result<(), LoxError>>
-    for Interpreter<F>
-{
-    fn visit_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
+    fn execute_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
         for stmt in node.stmts.iter() {
-            self.visit_stmt(&stmt)?;
+            self.execute(&stmt)?;
         }
         Ok(())
     }
 
-    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> Result<Object, LoxError> {
-        let value = self.visit_expr(&node.value)?;
-        self.environment
-            .borrow_mut()
-            .assign(&node.name, value.clone())?;
-        Ok(value)
-    }
-    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> Result<Object, LoxError> {
-        let left = self.visit_expr(&node.left)?;
-        let right = self.visit_expr(&node.right)?;
-
-        match node.operator.type_ {
-            TokenType::Minus => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l - r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for subtraction"),
-            },
-            TokenType::Plus => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l + r)),
-                (Object::String(l), Object::String(r)) => Ok(Object::String(l + &r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for addition"),
-            },
-            TokenType::Slash => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l / r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for division"),
-            },
-            TokenType::Star => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l * r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for multiplication"),
-            },
-            TokenType::Greater => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l > r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
-            },
-            TokenType::GreaterEqual => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l >= r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
-            },
-            TokenType::Less => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l < r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
-            },
-            TokenType::LessEqual => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l <= r)),
-                (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
-            },
-            TokenType::EqualEqual => Ok(Object::Bool(self.is_equal(left, right))),
-            TokenType::BangEqual => Ok(Object::Bool(!self.is_equal(left, right))),
-            _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
-        }
-    }
-    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> Result<Object, LoxError> {
-        self.visit_expr(&node.expr)
-    }
-    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> Result<Object, LoxError> {
-        Ok(node.value.clone())
-    }
-    fn visit_logical_expr(&mut self, node: &LogicalExpr) -> Result<Object, LoxError> {
-        let left = self.visit_expr(&node.left)?;
-        match (node.operator.type_, self.is_truthy(&left)) {
-            (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
-            (TokenType::Or, false) | (TokenType::And, true) => self.visit_expr(&node.right),
-            _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
-        }
-    }
-    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> Result<Object, LoxError> {
-        let right = self.visit_expr(&node.right)?;
-
-        match node.operator.type_ {
-            TokenType::Bang => Ok(Object::Bool(!self.is_truthy(&right))),
-            TokenType::Minus => match right {
-                Object::Number(n) => Ok(Object::Number(-n)),
-                _ => runtime_error(&node.operator, "invalid type for negation"),
-            },
-            _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
-        }
-    }
-
-    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> Result<Object, LoxError> {
-        self.environment.borrow().get(&node.name)
-    }
-
-    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> Result<(), LoxError> {
-        let prev = self.environment.clone();
-        self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
-        for stmt in &node.stmts {
-            self.visit_stmt(&stmt)?;
-        }
-        self.environment = prev;
-        Ok(())
-    }
-
-    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> Result<(), LoxError> {
-        self.visit_expr(&node.expr)?;
-        Ok(())
-    }
-
-    fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> Result<(), LoxError> {
-        let cond = self.visit_expr(&node.condition)?;
-        if self.is_truthy(&cond) {
-            self.visit_stmt(&node.then_)
-        } else {
-            match &node.else_ {
-                Some(e) => self.visit_stmt(e),
-                None => Ok(()),
+    fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object, LoxError> {
+        match node {
+            Expr::Assign(node) => {
+                let value = self.evaluate(&node.value)?;
+                self.environment
+                    .borrow_mut()
+                    .assign(&node.name, value.clone())?;
+                Ok(value)
             }
+            Expr::Binary(node) => {
+                let left = self.evaluate(&node.left)?;
+                let right = self.evaluate(&node.right)?;
+
+                match node.operator.type_ {
+                    TokenType::Minus => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l - r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for subtraction"),
+                    },
+                    TokenType::Plus => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l + r)),
+                        (Object::String(l), Object::String(r)) => Ok(Object::String(l + &r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for addition"),
+                    },
+                    TokenType::Slash => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l / r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for division"),
+                    },
+                    TokenType::Star => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l * r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for multiplication"),
+                    },
+                    TokenType::Greater => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l > r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                    },
+                    TokenType::GreaterEqual => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l >= r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                    },
+                    TokenType::Less => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l < r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                    },
+                    TokenType::LessEqual => match (left, right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l <= r)),
+                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                    },
+                    TokenType::EqualEqual => Ok(Object::Bool(self.is_equal(left, right))),
+                    TokenType::BangEqual => Ok(Object::Bool(!self.is_equal(left, right))),
+                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                }
+            }
+            Expr::Grouping(node) => self.evaluate(&node.expr),
+            Expr::Literal(node) => Ok(node.value.clone()),
+            Expr::Logical(node) => {
+                let left = self.evaluate(&node.left)?;
+                match (node.operator.type_, self.is_truthy(&left)) {
+                    (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
+                    (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(&node.right),
+                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                }
+            }
+            Expr::Unary(node) => {
+                let right = self.evaluate(&node.right)?;
+
+                match node.operator.type_ {
+                    TokenType::Bang => Ok(Object::Bool(!self.is_truthy(&right))),
+                    TokenType::Minus => match right {
+                        Object::Number(n) => Ok(Object::Number(-n)),
+                        _ => runtime_error(&node.operator, "invalid type for negation"),
+                    },
+                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                }
+            }
+            Expr::Variable(node) => self.environment.borrow().get(&node.name),
         }
     }
 
-    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> Result<(), LoxError> {
-        let value = self.visit_expr(&node.expr)?;
-        let stringified = self.stringify(value);
-        (self.printer)(stringified);
-        Ok(())
-    }
-
-    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> Result<(), LoxError> {
-        let value = match &node.initializer {
-            Some(expr) => self.visit_expr(&expr)?,
-            None => Object::Nil,
-        };
-
-        self.environment
-            .borrow_mut()
-            .define(node.name.lexeme, value);
-        Ok(())
-    }
-
-    fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> Result<(), LoxError> {
-        loop {
-            let cond = self.visit_expr(&node.condition)?;
-            if !self.is_truthy(&cond) {
-                break;
+    fn execute(&mut self, node: &Stmt<'a>) -> Result<(), LoxError> {
+        match node {
+            Stmt::Block(node) => {
+                let prev = self.environment.clone();
+                self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
+                for stmt in &node.stmts {
+                    self.execute(&stmt)?;
+                }
+                self.environment = prev;
             }
-            self.visit_stmt(&node.body)?;
+
+            Stmt::Expr(node) => {
+                self.evaluate(&node.expr)?;
+            }
+
+            Stmt::If(node) => {
+                let cond = self.evaluate(&node.condition)?;
+                if self.is_truthy(&cond) {
+                    self.execute(&node.then_)?;
+                } else {
+                    match &node.else_ {
+                        Some(e) => self.execute(e)?,
+                        None => {}
+                    }
+                }
+            }
+            Stmt::Print(node) => {
+                let value = self.evaluate(&node.expr)?;
+                let stringified = self.stringify(value);
+                (self.printer)(stringified);
+            }
+            Stmt::Var(node) => {
+                let value = match &node.initializer {
+                    Some(expr) => self.evaluate(&expr)?,
+                    None => Object::Nil,
+                };
+
+                self.environment
+                    .borrow_mut()
+                    .define(node.name.lexeme, value);
+            }
+            Stmt::While(node) => loop {
+                let cond = self.evaluate(&node.condition)?;
+                if !self.is_truthy(&cond) {
+                    break;
+                }
+                self.execute(&node.body)?;
+            },
         }
         Ok(())
     }

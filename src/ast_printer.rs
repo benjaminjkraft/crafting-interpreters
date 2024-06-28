@@ -1,98 +1,80 @@
+#[cfg(test)]
 use crate::ast::*;
 #[cfg(test)]
 use crate::parser;
+#[cfg(test)]
 use itertools::Itertools;
+#[cfg(test)]
 use std::fmt;
 
-struct AstPrinter {}
-
-#[allow(dead_code)]
-pub fn print<'a>(prog: Program<'a>) -> String {
-    (AstPrinter {}).visit_program(&prog)
+#[cfg(test)]
+pub fn print<'a>(node: Program<'a>) -> String {
+    node.stmts.iter().map(|stmt| print_stmt(stmt)).join("\n")
 }
 
+#[cfg(test)]
 fn parenthesize(items: impl IntoIterator<Item = impl fmt::Display>) -> String {
     format!("({})", items.into_iter().join(" "))
 }
 
-impl<'a> Visitor<'a, String, String> for AstPrinter {
-    fn visit_program(&mut self, node: &Program<'a>) -> String {
-        node.stmts
-            .iter()
-            .map(|stmt| self.visit_stmt(stmt))
-            .join("\n")
-    }
-    fn visit_assign_expr(&mut self, node: &AssignExpr<'a>) -> String {
-        parenthesize(&["assign", node.name.lexeme, &self.visit_expr(&node.value)])
-    }
-    fn visit_binary_expr(&mut self, node: &BinaryExpr<'a>) -> String {
-        parenthesize(&[
+#[cfg(test)]
+fn print_expr<'a>(node: &Expr<'a>) -> String {
+    match node {
+        Expr::Assign(node) => parenthesize(&["assign", node.name.lexeme, &print_expr(&node.value)]),
+        Expr::Binary(node) => parenthesize(&[
             node.operator.lexeme,
-            &self.visit_expr(&node.left),
-            &self.visit_expr(&node.right),
-        ])
-    }
-    fn visit_grouping_expr(&mut self, node: &GroupingExpr<'a>) -> String {
-        parenthesize(&["group", &self.visit_expr(&node.expr)])
-    }
-    fn visit_literal_expr(&mut self, node: &LiteralExpr) -> String {
-        parenthesize(&[&node.value.to_string()])
-    }
-    fn visit_logical_expr(&mut self, node: &LogicalExpr<'a>) -> String {
-        parenthesize(&[
+            &print_expr(&node.left),
+            &print_expr(&node.right),
+        ]),
+        Expr::Grouping(node) => parenthesize(&["group", &print_expr(&node.expr)]),
+        Expr::Literal(node) => parenthesize(&[&node.value.to_string()]),
+        Expr::Logical(node) => parenthesize(&[
             node.operator.lexeme,
-            &self.visit_expr(&node.left),
-            &self.visit_expr(&node.right),
-        ])
+            &print_expr(&node.left),
+            &print_expr(&node.right),
+        ]),
+        Expr::Unary(node) => parenthesize(&[node.operator.lexeme, &print_expr(&node.right)]),
+        Expr::Variable(node) => parenthesize(&["variable", node.name.lexeme]),
     }
-    fn visit_unary_expr(&mut self, node: &UnaryExpr<'a>) -> String {
-        parenthesize(&[node.operator.lexeme, &self.visit_expr(&node.right)])
-    }
-    fn visit_variable_expr(&mut self, node: &VariableExpr<'a>) -> String {
-        parenthesize(&["variable", node.name.lexeme])
-    }
+}
 
-    fn visit_block_stmt(&mut self, node: &BlockStmt<'a>) -> String {
-        format!(
+#[cfg(test)]
+fn print_stmt<'a>(node: &Stmt<'a>) -> String {
+    match node {
+        Stmt::Block(node) => format!(
             "(block\n{})",
             node.stmts
                 .iter()
-                .map(|stmt| format!("\t{}\n", self.visit_stmt(stmt)))
+                .map(|stmt| format!("\t{}\n", print_stmt(stmt)))
                 .join("")
-        )
-    }
-    fn visit_expr_stmt(&mut self, node: &ExprStmt<'a>) -> String {
-        parenthesize(&["expr", &self.visit_expr(&node.expr)])
-    }
-    fn visit_if_stmt(&mut self, node: &IfStmt<'a>) -> String {
-        let mut parts = vec![
-            "if".to_string(),
-            self.visit_expr(&node.condition),
-            self.visit_stmt(&node.then_),
-        ];
-        match &node.else_ {
-            Some(e) => parts.push(self.visit_stmt(e)),
-            None => {}
+        ),
+        Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
+        Stmt::If(node) => {
+            let mut parts = vec![
+                "if".to_string(),
+                print_expr(&node.condition),
+                print_stmt(&node.then_),
+            ];
+            match &node.else_ {
+                Some(e) => parts.push(print_stmt(e)),
+                None => {}
+            }
+            parenthesize(parts)
         }
-        parenthesize(parts)
-    }
-    fn visit_print_stmt(&mut self, node: &PrintStmt<'a>) -> String {
-        parenthesize(&["print", &self.visit_expr(&node.expr)])
-    }
-    fn visit_var_stmt(&mut self, node: &VarStmt<'a>) -> String {
-        let mut parts = vec!["var".to_string(), node.name.lexeme.to_string()];
-        match &node.initializer {
-            Some(e) => parts.push(self.visit_expr(e)),
-            None => {}
+        Stmt::Print(node) => parenthesize(&["print", &print_expr(&node.expr)]),
+        Stmt::Var(node) => {
+            let mut parts = vec!["var".to_string(), node.name.lexeme.to_string()];
+            match &node.initializer {
+                Some(e) => parts.push(print_expr(e)),
+                None => {}
+            }
+            parenthesize(parts)
         }
-        parenthesize(parts)
-    }
-    fn visit_while_stmt(&mut self, node: &WhileStmt<'a>) -> String {
-        parenthesize(&[
+        Stmt::While(node) => parenthesize(&[
             "while",
-            &self.visit_expr(&node.condition),
-            &self.visit_stmt(&node.body),
-        ])
+            &print_expr(&node.condition),
+            &print_stmt(&node.body),
+        ]),
     }
 }
 
