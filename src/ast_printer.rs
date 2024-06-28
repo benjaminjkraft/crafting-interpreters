@@ -26,6 +26,13 @@ fn print_expr<'a>(node: &Expr<'a>) -> String {
             &print_expr(&node.left),
             &print_expr(&node.right),
         ]),
+        Expr::Call(node) => {
+            let mut parts = vec!["call".to_string(), print_expr(&node.callee)];
+            for argument in &node.arguments {
+                parts.push(print_expr(&argument));
+            }
+            parenthesize(&parts)
+        }
         Expr::Grouping(node) => parenthesize(&["group", &print_expr(&node.expr)]),
         Expr::Literal(node) => parenthesize(&[&node.value.to_string()]),
         Expr::Logical(node) => parenthesize(&[

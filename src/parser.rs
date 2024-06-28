@@ -315,7 +315,48 @@ impl<'a> Parser<'a> {
             .into());
         }
 
-        return self.primary();
+        return self.call();
+    }
+
+    fn call(&mut self) -> Result<Expr<'a>, LoxError> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.match_(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr<'a>) -> Result<Expr<'a>, LoxError> {
+        let mut arguments = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    // TODO: not supposed to return here, in theory.
+                    return Err(error::parse_error(
+                        self.peek(),
+                        "Can't have more than 255 arguments.",
+                    ));
+                }
+                arguments.push(self.expression()?);
+                if !self.match_(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+
+        Ok(CallExpr {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        }
+        .into())
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, LoxError> {
@@ -559,4 +600,21 @@ fn test_parser_for() {
     );
     assert_parse_error("for (;) 1;", &["[line 1] Error at ')': Expect expression."]);
     assert_parse_error("for () 1;", &["[line 1] Error at ')': Expect expression."]);
+}
+
+#[test]
+fn test_parser_call() {
+    assert_parses_to("f();", "(expr (call (variable f)))");
+    assert_parses_to("f(1, 2, 3);", "(expr (call (variable f) (1) (2) (3)))");
+    assert_parses_to(
+        "f(1)(2)(3);",
+        "(expr (call (call (call (variable f) (1)) (2)) (3)))",
+    );
+
+    assert_parse_error("f(;", &["[line 1] Error at ';': Expect expression."]);
+    assert_parse_error(
+        "f(1;",
+        &["[line 1] Error at ';': Expect ')' after arguments."],
+    );
+    assert_parse_error("f(1,;", &["[line 1] Error at ';': Expect expression."]);
 }

@@ -1,22 +1,42 @@
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
-use crate::object::Object;
+use crate::object::{Function, Object};
 use crate::parser;
 use crate::scanner;
 use crate::scanner::TokenType;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time;
 
 pub struct Interpreter<F: FnMut(String)> {
+    // TODO: define printer as a global (even if it's still a magic statement)?
     printer: F,
+    globals: Rc<RefCell<Environment>>,
     environment: Rc<RefCell<Environment>>,
 }
 
+fn now_sec() -> Result<Object, LoxError> {
+    match time::SystemTime::now().duration_since(time::UNIX_EPOCH) {
+        Ok(t) => Ok(Object::Number(t.as_secs_f64())),
+        Err(e) => panic!("{}", e),
+    }
+}
+
 pub fn interpreter() -> Interpreter<impl FnMut(String)> {
+    let globals = Rc::new(RefCell::new(Environment::new()));
+    globals.borrow_mut().define(
+        "clock",
+        Object::Function(Function {
+            arity: 0,
+            function: Rc::new(RefCell::new(|_| now_sec())),
+            name: "clock".to_string(),
+        }),
+    );
     Interpreter {
         printer: |s| println!("{}", s),
-        environment: Rc::new(RefCell::new(Environment::new())),
+        globals: globals.clone(),
+        environment: globals.clone(),
     }
 }
 
@@ -90,6 +110,35 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
+            Expr::Call(node) => {
+                let callee = self.evaluate(&node.callee)?;
+
+                let mut arguments = Vec::new();
+                for argument in &node.arguments {
+                    arguments.push(self.evaluate(&argument)?);
+                }
+
+                match callee {
+                    Object::Function(f) => {
+                        if f.arity != arguments.len() {
+                            runtime_error(
+                                &node.paren,
+                                &format!(
+                                    "Expected {} arguments but got {}.",
+                                    f.arity,
+                                    arguments.len()
+                                ),
+                            )
+                        } else {
+                            (f.function.borrow_mut())(arguments)
+                        }
+                    }
+                    o => runtime_error(
+                        &node.paren,
+                        &format!("Can only call functions and classes, got '{}'.", o),
+                    ),
+                }
+            }
             Expr::Grouping(node) => self.evaluate(&node.expr),
             Expr::Literal(node) => Ok(node.value.clone()),
             Expr::Logical(node) => {
@@ -144,7 +193,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
             }
             Stmt::Print(node) => {
                 let value = self.evaluate(&node.expr)?;
-                let stringified = value.stringify();
+                let stringified = format!("{}", value);
                 (self.printer)(stringified);
             }
             Stmt::Var(node) => {
@@ -172,9 +221,23 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 #[cfg(test)]
 pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let mut printed: Vec<String> = Vec::new();
+    let mut time = 0.0;
+    let globals = Rc::new(RefCell::new(Environment::new()));
+    globals.borrow_mut().define(
+        "clock",
+        Object::Function(Function {
+            arity: 0,
+            function: Rc::new(RefCell::new(move |_| {
+                time += 1.0;
+                Ok(Object::Number(time))
+            })),
+            name: "clock".to_string(),
+        }),
+    );
     let mut interpreter = Interpreter {
         printer: |s| printed.push(s),
-        environment: Rc::new(RefCell::new(Environment::new())),
+        globals: globals.clone(),
+        environment: globals.clone(),
     };
     evaluate_source(&mut interpreter, source)?;
     Ok(printed)
@@ -335,5 +398,13 @@ fn test_evaluate_fors() {
             "1", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144", "233", "377", "610",
             "987", "1597", "2584", "4181", "6765",
         ],
+    );
+}
+
+#[test]
+fn test_call_builtin() {
+    assert_prints(
+        "print clock(); print clock(); print clock();",
+        &["1", "2", "3"],
     );
 }

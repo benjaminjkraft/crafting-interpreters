@@ -11,6 +11,7 @@ pub struct Program<'a> {
 pub enum Expr<'a> {
     Assign(AssignExpr<'a>),
     Binary(BinaryExpr<'a>),
+    Call(CallExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
     Logical(LogicalExpr<'a>),
@@ -39,6 +40,13 @@ pub struct BinaryExpr<'a> {
     pub left: Box<Expr<'a>>,
     pub operator: scanner::Token<'a>,
     pub right: Box<Expr<'a>>,
+}
+
+#[derive(Debug)]
+pub struct CallExpr<'a> {
+    pub callee: Box<Expr<'a>>,
+    pub paren: scanner::Token<'a>,
+    pub arguments: Vec<Expr<'a>>,
 }
 
 #[derive(Debug)]
