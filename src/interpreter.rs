@@ -31,38 +31,6 @@ pub fn evaluate_source<F: FnMut(String)>(
 }
 
 impl<'a, F: FnMut(String)> Interpreter<F> {
-    fn is_truthy(&mut self, obj: &Object) -> bool {
-        match &obj {
-            Object::Nil => false,
-            Object::Bool(b) => *b,
-            _ => true,
-        }
-    }
-
-    fn is_equal(&mut self, left: Object, right: Object) -> bool {
-        match (left, right) {
-            (Object::Nil, Object::Nil) => true,
-            (Object::Nil, _) | (_, Object::Nil) => false,
-            (Object::Bool(l), Object::Bool(r)) => l == r,
-            (Object::Bool(_), _) | (_, Object::Bool(_)) => false,
-            (Object::String(l), Object::String(r)) => l == r,
-            (Object::String(_), _) | (_, Object::String(_)) => false,
-            // Note: matching IEEE semantics rather than Java .equals semantics, because clox does
-            // that anyway and I can't be bothered to match Java's nonsense.
-            (Object::Number(l), Object::Number(r)) => l == r,
-            // (Object::Number(_), _) | (_, Object::Number(_)) => false,
-        }
-    }
-
-    pub fn stringify(&self, obj: Object) -> String {
-        match obj {
-            Object::Nil => "nil".to_string(),
-            Object::Bool(b) => b.to_string(),
-            Object::String(s) => s.clone(),
-            Object::Number(n) => n.to_string(),
-        }
-    }
-
     fn execute_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
         for stmt in node.stmts.iter() {
             self.execute(&stmt)?;
@@ -117,8 +85,8 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                         (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l <= r)),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
-                    TokenType::EqualEqual => Ok(Object::Bool(self.is_equal(left, right))),
-                    TokenType::BangEqual => Ok(Object::Bool(!self.is_equal(left, right))),
+                    TokenType::EqualEqual => Ok(Object::Bool(left.is_equal(&right))),
+                    TokenType::BangEqual => Ok(Object::Bool(!left.is_equal(&right))),
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
@@ -126,7 +94,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
             Expr::Literal(node) => Ok(node.value.clone()),
             Expr::Logical(node) => {
                 let left = self.evaluate(&node.left)?;
-                match (node.operator.type_, self.is_truthy(&left)) {
+                match (node.operator.type_, left.is_truthy()) {
                     (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
                     (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(&node.right),
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
@@ -136,7 +104,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                 let right = self.evaluate(&node.right)?;
 
                 match node.operator.type_ {
-                    TokenType::Bang => Ok(Object::Bool(!self.is_truthy(&right))),
+                    TokenType::Bang => Ok(Object::Bool(!right.is_truthy())),
                     TokenType::Minus => match right {
                         Object::Number(n) => Ok(Object::Number(-n)),
                         _ => runtime_error(&node.operator, "invalid type for negation"),
@@ -165,7 +133,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
 
             Stmt::If(node) => {
                 let cond = self.evaluate(&node.condition)?;
-                if self.is_truthy(&cond) {
+                if cond.is_truthy() {
                     self.execute(&node.then_)?;
                 } else {
                     match &node.else_ {
@@ -176,7 +144,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
             }
             Stmt::Print(node) => {
                 let value = self.evaluate(&node.expr)?;
-                let stringified = self.stringify(value);
+                let stringified = value.stringify();
                 (self.printer)(stringified);
             }
             Stmt::Var(node) => {
@@ -191,7 +159,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
             }
             Stmt::While(node) => loop {
                 let cond = self.evaluate(&node.condition)?;
-                if !self.is_truthy(&cond) {
+                if !cond.is_truthy() {
                     break;
                 }
                 self.execute(&node.body)?;
