@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Object {
     Number(f64),
     Bool(bool),
@@ -18,14 +18,6 @@ pub struct Function {
     pub arity: usize,
     pub function: Rc<RefCell<dyn FnMut(Vec<Object>) -> Result<Object, LoxError>>>,
     pub name: String,
-}
-
-impl PartialEq for Function {
-    fn eq(&self, other: &Self) -> bool {
-        self.arity == other.arity
-            && Rc::ptr_eq(&self.function, &other.function)
-            && self.name == other.name
-    }
 }
 
 impl fmt::Debug for Function {
@@ -60,8 +52,10 @@ impl Object {
             _ => true,
         }
     }
+}
 
-    pub fn is_equal(&self, other: &Self) -> bool {
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Object::Nil, Object::Nil) => true,
             (Object::Nil, _) | (_, Object::Nil) => false,
@@ -73,8 +67,9 @@ impl Object {
             // that anyway and I can't be bothered to match Java's nonsense.
             (Object::Number(l), Object::Number(r)) => l == r,
             (Object::Number(_), _) | (_, Object::Number(_)) => false,
-            (Object::BuiltinFunction(l), Object::BuiltinFunction(r)) => l == r,
-            // (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
+            (Object::BuiltinFunction(l), Object::BuiltinFunction(r)) => {
+                l.arity == r.arity && Rc::ptr_eq(&l.function, &r.function) && l.name == r.name
+            } // (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
         }
     }
 }

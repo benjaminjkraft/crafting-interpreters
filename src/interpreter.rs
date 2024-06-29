@@ -102,8 +102,8 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                         (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l <= r)),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
-                    TokenType::EqualEqual => Ok(Object::Bool(left.is_equal(&right))),
-                    TokenType::BangEqual => Ok(Object::Bool(!left.is_equal(&right))),
+                    TokenType::EqualEqual => Ok(Object::Bool(left.eq(&right))),
+                    TokenType::BangEqual => Ok(Object::Bool(!left.eq(&right))),
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
