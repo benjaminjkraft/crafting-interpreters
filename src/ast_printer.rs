@@ -46,16 +46,29 @@ fn print_expr<'a>(node: &Expr<'a>) -> String {
 }
 
 #[cfg(test)]
+fn print_block<'a>(head: &str, stmts: &Vec<Stmt<'a>>) -> String {
+    format!(
+        "({}\n{})",
+        head,
+        stmts
+            .iter()
+            .map(|stmt| format!("\t{}\n", print_stmt(stmt)))
+            .join("")
+    )
+}
+
+#[cfg(test)]
 fn print_stmt<'a>(node: &Stmt<'a>) -> String {
     match node {
-        Stmt::Block(node) => format!(
-            "(block\n{})",
-            node.stmts
-                .iter()
-                .map(|stmt| format!("\t{}\n", print_stmt(stmt)))
-                .join("")
-        ),
+        Stmt::Block(node) => print_block("block", &node.stmts),
         Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
+        Stmt::Function(node) => {
+            let mut parts = vec!["fun", node.name.lexeme];
+            parts.extend(node.parameters.iter().map(|param| param.lexeme));
+            let body = print_block("", &node.body);
+            parts.push(&body);
+            parenthesize(parts)
+        }
         Stmt::If(node) => {
             let mut parts = vec![
                 "if".to_string(),

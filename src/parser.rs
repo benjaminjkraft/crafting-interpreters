@@ -46,6 +46,8 @@ impl<'a> Parser<'a> {
     fn declaration(&mut self) -> Result<Stmt<'a>, LoxError> {
         if self.match_(&[TokenType::Var]) {
             self.var_declaration()
+        } else if self.match_(&[TokenType::Fun]) {
+            self.function("function")
         } else {
             self.statement()
         }
@@ -180,13 +182,20 @@ impl<'a> Parser<'a> {
         Ok(body_with_initializer)
     }
 
-    fn block_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+    fn block(&mut self) -> Result<Vec<Stmt<'a>>, LoxError> {
         let mut stmts = Vec::new();
         while !self.is_at_end() && !self.check(TokenType::RightBrace) {
             stmts.push(self.declaration()?);
         }
         self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
-        Ok(BlockStmt { stmts }.into())
+        Ok(stmts)
+    }
+
+    fn block_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
+        Ok(BlockStmt {
+            stmts: self.block()?,
+        }
+        .into())
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, LoxError> {
@@ -194,6 +203,48 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(ExprStmt {
             expr: Box::new(value),
+        }
+        .into())
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt<'a>, LoxError> {
+        let name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?;
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
+        let mut parameters = Vec::new();
+        // TODO: abstract into some kind of parse-list-while loop?
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    // TODO: not supposed to return here, in theory.
+                    return Err(error::parse_error(
+                        self.peek(),
+                        "Can't have more than 255 parameters.",
+                    ));
+                }
+
+                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+
+                if !self.match_(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(
+            TokenType::RightParen,
+            &format!("Expect ')' after parameters."),
+        )?;
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+        let body = self.block()?;
+        Ok(FunctionStmt {
+            name,
+            parameters,
+            body,
         }
         .into())
     }
@@ -617,4 +668,33 @@ fn test_parser_call() {
         &["[line 1] Error at ';': Expect ')' after arguments."],
     );
     assert_parse_error("f(1,;", &["[line 1] Error at ';': Expect expression."]);
+}
+
+#[test]
+fn test_parser_function() {
+    assert_parses_to("fun f() {}", "(fun f (\n))");
+    assert_parses_to("fun f(a) {}", "(fun f a (\n))");
+    assert_parses_to("fun f(a, b) {}", "(fun f a b (\n))");
+    assert_parses_to(
+        "fun f(a) { print a; }",
+        "(fun f a (\n\t(print (variable a))\n))",
+    );
+
+    assert_parse_error("fun();", &["[line 1] Error at '(': Expect function name."]);
+    assert_parse_error(
+        "fun f;",
+        &["[line 1] Error at ';': Expect '(' after function name."],
+    );
+    assert_parse_error(
+        "fun f(;",
+        &["[line 1] Error at ';': Expect parameter name."],
+    );
+    assert_parse_error(
+        "fun f(a;",
+        &["[line 1] Error at ';': Expect ')' after parameters."],
+    );
+    assert_parse_error(
+        "fun f(a);",
+        &["[line 1] Error at ';': Expect '{' before function body."],
+    );
 }

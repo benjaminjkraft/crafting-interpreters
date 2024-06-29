@@ -23,6 +23,7 @@ pub enum Expr<'a> {
 pub enum Stmt<'a> {
     Block(BlockStmt<'a>),
     Expr(ExprStmt<'a>),
+    Function(FunctionStmt<'a>),
     If(IfStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
@@ -85,6 +86,13 @@ pub struct BlockStmt<'a> {
 #[derive(Debug)]
 pub struct ExprStmt<'a> {
     pub expr: Box<Expr<'a>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionStmt<'a> {
+    pub name: scanner::Token<'a>,
+    pub parameters: Vec<scanner::Token<'a>>,
+    pub body: Vec<Stmt<'a>>,
 }
 
 #[derive(Debug)]

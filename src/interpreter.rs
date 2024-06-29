@@ -52,10 +52,7 @@ pub fn evaluate_source<F: FnMut(String)>(
 
 impl<'a, F: FnMut(String)> Interpreter<F> {
     fn execute_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
-        for stmt in node.stmts.iter() {
-            self.execute(&stmt)?;
-        }
-        Ok(())
+        self.execute_stmts(&node.stmts)
     }
 
     fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object, LoxError> {
@@ -165,20 +162,27 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
         }
     }
 
+    fn execute_stmts(&mut self, stmts: &Vec<Stmt<'a>>) -> Result<(), LoxError> {
+        for stmt in stmts {
+            self.execute(&stmt)?;
+        }
+        Ok(())
+    }
+
     fn execute(&mut self, node: &Stmt<'a>) -> Result<(), LoxError> {
         match node {
             Stmt::Block(node) => {
                 let prev = self.environment.clone();
                 self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
-                for stmt in &node.stmts {
-                    self.execute(&stmt)?;
-                }
+                self.execute_stmts(&node.stmts)?;
                 self.environment = prev;
             }
 
             Stmt::Expr(node) => {
                 self.evaluate(&node.expr)?;
             }
+
+            Stmt::Function(node) => todo!(),
 
             Stmt::If(node) => {
                 let cond = self.evaluate(&node.condition)?;
