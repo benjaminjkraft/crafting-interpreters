@@ -10,7 +10,7 @@ pub enum Object {
     // TODO(benkraft): Immutable strings could something something.
     String(String),
     Nil,
-    Function(Function),
+    BuiltinFunction(Function),
 }
 
 #[derive(Clone)]
@@ -47,7 +47,7 @@ impl fmt::Display for Object {
             Object::Bool(v) => write!(f, "{}", v),
             Object::String(v) => write!(f, "{}", v),
             Object::Nil => write!(f, "nil"),
-            Object::Function(v) => v.fmt(f),
+            Object::BuiltinFunction(v) => v.fmt(f),
         }
     }
 }
@@ -73,8 +73,8 @@ impl Object {
             // that anyway and I can't be bothered to match Java's nonsense.
             (Object::Number(l), Object::Number(r)) => l == r,
             (Object::Number(_), _) | (_, Object::Number(_)) => false,
-            (Object::Function(l), Object::Function(r)) => l == r,
-            // (Object::Function(_), _) | (_, Object::Function(_)) => false,
+            (Object::BuiltinFunction(l), Object::BuiltinFunction(r)) => l == r,
+            // (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
         }
     }
 }

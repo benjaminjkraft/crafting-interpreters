@@ -27,7 +27,7 @@ pub fn interpreter() -> Interpreter<impl FnMut(String)> {
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
-        Object::Function(Function {
+        Object::BuiltinFunction(Function {
             arity: 0,
             function: Rc::new(RefCell::new(|_| now_sec())),
             name: "clock".to_string(),
@@ -116,7 +116,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                 }
 
                 match callee {
-                    Object::Function(f) => {
+                    Object::BuiltinFunction(f) => {
                         if f.arity != arguments.len() {
                             runtime_error(
                                 &node.paren,
@@ -229,7 +229,7 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
-        Object::Function(Function {
+        Object::BuiltinFunction(Function {
             arity: 0,
             function: Rc::new(RefCell::new(move |_| {
                 time += 1.0;
