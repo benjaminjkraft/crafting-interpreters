@@ -8,7 +8,7 @@ use itertools::Itertools;
 use std::fmt;
 
 #[cfg(test)]
-pub fn print<'a>(node: Program<'a>) -> String {
+pub fn print<'src>(node: Program<'src>) -> String {
     node.stmts.iter().map(|stmt| print_stmt(stmt)).join("\n")
 }
 
@@ -18,7 +18,7 @@ fn parenthesize(items: impl IntoIterator<Item = impl fmt::Display>) -> String {
 }
 
 #[cfg(test)]
-fn print_expr<'a>(node: &Expr<'a>) -> String {
+fn print_expr<'src>(node: &Expr<'src>) -> String {
     match node {
         Expr::Assign(node) => parenthesize(&["assign", node.name.lexeme, &print_expr(&node.value)]),
         Expr::Binary(node) => parenthesize(&[
@@ -46,7 +46,7 @@ fn print_expr<'a>(node: &Expr<'a>) -> String {
 }
 
 #[cfg(test)]
-fn print_block<'a>(head: &str, stmts: &Vec<Stmt<'a>>) -> String {
+fn print_block<'src>(head: &str, stmts: &Vec<Stmt<'src>>) -> String {
     format!(
         "({}\n{})",
         head,
@@ -58,7 +58,7 @@ fn print_block<'a>(head: &str, stmts: &Vec<Stmt<'a>>) -> String {
 }
 
 #[cfg(test)]
-fn print_stmt<'a>(node: &Stmt<'a>) -> String {
+fn print_stmt<'src>(node: &Stmt<'src>) -> String {
     match node {
         Stmt::Block(node) => print_block("block", &node.stmts),
         Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),

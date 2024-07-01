@@ -7,51 +7,41 @@ Ok(
         Token {
             type_: And,
             lexeme: "and",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Class,
             lexeme: "class",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Identifier,
             lexeme: "class_",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Else,
             lexeme: "else",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: False,
             lexeme: "false",
-            literal: Bool(
-                false,
-            ),
             line: 1,
         },
         Token {
             type_: For,
             lexeme: "for",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Fun,
             lexeme: "fun",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: EOF,
             lexeme: "",
-            literal: Nil,
             line: 1,
         },
     ],

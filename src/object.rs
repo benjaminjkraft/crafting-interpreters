@@ -5,72 +5,87 @@ use std::fmt;
 use std::ptr;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
-pub enum Object<'a> {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
     Number(f64),
     Bool(bool),
     // TODO(benkraft): Immutable strings could something something.
     String(String),
     Nil,
-    BuiltinFunction(Function<'a>),
-    Function(&'a ast::FunctionStmt<'a>),
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Literal::Number(v) => write!(f, "{}", v),
+            Literal::Bool(v) => write!(f, "{}", v),
+            Literal::String(v) => write!(f, "{}", v),
+            Literal::Nil => write!(f, "nil"),
+        }
+    }
+}
+
+impl Literal {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Literal::Nil => false,
+            Literal::Bool(b) => *b,
+            _ => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Object<'ast, 'src: 'ast> {
+    Literal(Literal),
+    BuiltinFunction(Function<'ast, 'src>),
+    Function(&'ast ast::FunctionStmt<'src>),
 }
 
 #[derive(Clone)]
-pub struct Function<'a> {
+pub struct Function<'ast, 'src> {
     pub arity: usize,
-    pub function: Rc<RefCell<dyn FnMut(Vec<Object<'a>>) -> Result<Object<'a>, LoxError>>>,
+    pub function:
+        Rc<RefCell<dyn FnMut(Vec<Object<'ast, 'src>>) -> Result<Object<'ast, 'src>, LoxError>>>,
     pub name: String,
 }
 
-impl fmt::Debug for Function<'_> {
+impl fmt::Debug for Function<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<function {} (arity {})>", &self.name, &self.arity)
     }
 }
 
-impl fmt::Display for Function<'_> {
+impl fmt::Display for Function<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<function {}>", &self.name)
     }
 }
 
-impl<'a> fmt::Display for Object<'a> {
+impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Object::Number(v) => write!(f, "{}", v),
-            Object::Bool(v) => write!(f, "{}", v),
-            Object::String(v) => write!(f, "{}", v),
-            Object::Nil => write!(f, "nil"),
+            Object::Literal(v) => write!(f, "{}", v),
             Object::BuiltinFunction(v) => v.fmt(f),
             Object::Function(stmt) => write!(f, "<function {}>", stmt.name.lexeme),
         }
     }
 }
 
-impl<'a> Object<'a> {
+impl<'ast, 'src: 'ast> Object<'ast, 'src> {
     pub fn is_truthy(&self) -> bool {
         match self {
-            Object::Nil => false,
-            Object::Bool(b) => *b,
+            Object::Literal(v) => v.is_truthy(),
             _ => true,
         }
     }
 }
 
-impl<'a> PartialEq for Object<'a> {
+impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Object::Nil, Object::Nil) => true,
-            (Object::Nil, _) | (_, Object::Nil) => false,
-            (Object::Bool(l), Object::Bool(r)) => l == r,
-            (Object::Bool(_), _) | (_, Object::Bool(_)) => false,
-            (Object::String(l), Object::String(r)) => l == r,
-            (Object::String(_), _) | (_, Object::String(_)) => false,
-            // Note: matching IEEE semantics rather than Java .equals semantics, because clox does
-            // that anyway and I can't be bothered to match Java's nonsense.
-            (Object::Number(l), Object::Number(r)) => l == r,
-            (Object::Number(_), _) | (_, Object::Number(_)) => false,
+            (Object::Literal(l), Object::Literal(r)) => l == r,
+            (Object::Literal(_), _) | (_, Object::Literal(_)) => false,
             (Object::BuiltinFunction(l), Object::BuiltinFunction(r)) => {
                 l.arity == r.arity && Rc::ptr_eq(&l.function, &r.function) && l.name == r.name
             }

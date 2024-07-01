@@ -7,57 +7,41 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1",
-            literal: Number(
-                1.0,
-            ),
             line: 1,
         },
         Token {
             type_: Slash,
             lexeme: "/",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Number,
             lexeme: "1.1",
-            literal: Number(
-                1.1,
-            ),
             line: 1,
         },
         Token {
             type_: Slash,
             lexeme: "/",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Number,
             lexeme: "1.23",
-            literal: Number(
-                1.23,
-            ),
             line: 1,
         },
         Token {
             type_: Slash,
             lexeme: "/",
-            literal: Nil,
             line: 1,
         },
         Token {
             type_: Number,
             lexeme: "123.45",
-            literal: Number(
-                123.45,
-            ),
             line: 1,
         },
         Token {
             type_: EOF,
             lexeme: "",
-            literal: Nil,
             line: 1,
         },
     ],

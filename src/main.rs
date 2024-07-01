@@ -36,9 +36,10 @@ fn main() -> ExitCode {
 
 fn run_file(path: &str) -> Result<(), LoxError> {
     let source = fs::read_to_string(path).unwrap();
+    let tokens = scanner::scan_tokens(&source)?;
+    let prog = parser::parse(tokens)?;
     let mut interpreter = interpreter::interpreter();
-    // TODO: this doesn't feel like it should need to leak?
-    execute_and_leak_source(&mut interpreter, source)
+    interpreter.execute_program(&prog)
 }
 
 fn read_line() -> Option<String> {
@@ -52,8 +53,12 @@ fn read_line() -> Option<String> {
     }
 }
 
-fn execute_and_leak_source<'a, F: FnMut(String)>(
-    interpreter: &mut interpreter::Interpreter<'a, F>,
+// Leaks the source because in a REPL we do actually need to keep
+// the source forever (for functions). Just leaking explicitly is
+// easier than trying to track a reference that's basically the
+// life of the program anyway.
+fn execute_and_leak_source<'ast, 'src: 'ast, F: FnMut(String)>(
+    interpreter: &mut interpreter::Interpreter<'ast, 'src, F>,
     source: String,
 ) -> Result<(), LoxError> {
     let tokens = scanner::scan_tokens(String::leak(source))?;

@@ -1,20 +1,18 @@
 use crate::error::LoxError;
-use crate::object;
-use crate::object::Object;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fmt;
 use TokenType::*;
 
-pub struct Scanner<'a> {
-    source: &'a str,
+pub struct Scanner<'src> {
+    source: &'src str,
     start: usize,
     current: usize,
     line: usize,
 }
 
-impl<'a> Scanner<'a> {
-    fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, LoxError> {
+impl<'src> Scanner<'src> {
+    fn scan_tokens(&mut self) -> Result<Vec<Token<'src>>, LoxError> {
         let mut tokens = Vec::new();
         while !self.is_at_end() {
             self.start = self.current;
@@ -27,7 +25,6 @@ impl<'a> Scanner<'a> {
         tokens.push(Token {
             type_: EOF,
             lexeme: "",
-            literal: Object::Nil,
             line: self.line,
         });
         Ok(tokens)
@@ -37,7 +34,7 @@ impl<'a> Scanner<'a> {
         self.current >= self.source.len()
     }
 
-    fn scan_token(&mut self) -> Result<Option<Token<'a>>, LoxError> {
+    fn scan_token(&mut self) -> Result<Option<Token<'src>>, LoxError> {
         let c = self.advance();
         Ok(match c {
             b'(' => self.token(LeftParen),
@@ -89,7 +86,7 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    fn err(&mut self, message: String) -> Result<Option<Token<'a>>, LoxError> {
+    fn err(&mut self, message: String) -> Result<Option<Token<'src>>, LoxError> {
         Err(LoxError {
             line: self.line,
             loc: String::new(),
@@ -140,53 +137,41 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn token(&self, type_: TokenType) -> Option<Token<'a>> {
-        self.token_literal(type_, Object::Nil)
-    }
-
-    fn token_literal(&self, type_: TokenType, literal: Object<'a>) -> Option<Token<'a>> {
+    fn token(&self, type_: TokenType) -> Option<Token<'src>> {
         Some(Token {
             type_,
             lexeme: &self.source[self.start..self.current],
-            literal,
             line: self.line,
         })
     }
 
-    fn string(&mut self) -> Result<Option<Token<'a>>, LoxError> {
+    fn string(&mut self) -> Result<Option<Token<'src>>, LoxError> {
         self.advance_all(|c| c != b'"');
         if !self.match_(b'"') {
             self.err("Unterminated string".to_string())?;
         }
 
-        let val = &self.source[self.start + 1..self.current - 1];
-        Ok(self.token_literal(StringLiteral, Object::String(val.to_string())))
+        Ok(self.token(StringLiteral))
     }
 
-    fn number(&mut self) -> Option<Token<'a>> {
+    fn number(&mut self) -> Option<Token<'src>> {
         self.advance_all(is_digit);
         let decimal = self.peek() == Some(b'.') && self.peek_next().is_some_and(is_digit);
         if decimal {
             self.advance();
             self.advance_all(is_digit);
         }
-        let val = &self.source[self.start..self.current];
-        self.token_literal(Number, Object::Number(val.parse().unwrap()))
+        self.token(Number)
     }
 
-    fn identifier(&mut self) -> Option<Token<'a>> {
+    fn identifier(&mut self) -> Option<Token<'src>> {
         self.advance_all(is_alpha_numeric);
 
         let type_ = KEYWORDS
             .get(&self.source[self.start..self.current])
             .copied()
             .unwrap_or(Identifier);
-        match type_ {
-            True => self.token_literal(type_, Object::Bool(true)),
-            False => self.token_literal(type_, Object::Bool(false)),
-            Nil => self.token_literal(type_, Object::Nil),
-            _ => self.token(type_),
-        }
+        self.token(type_)
     }
 }
 
@@ -202,7 +187,7 @@ fn is_alpha_numeric(c: u8) -> bool {
     return is_digit(c) || is_alpha(c);
 }
 
-pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
+pub fn scan_tokens<'src>(source: &'src str) -> Result<Vec<Token<'src>>, LoxError> {
     let mut scanner = Scanner {
         source,
         start: 0,
@@ -213,16 +198,15 @@ pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Token<'a> {
+pub struct Token<'src> {
     pub type_: TokenType,
-    pub lexeme: &'a str,
-    pub literal: object::Object<'a>,
+    pub lexeme: &'src str,
     pub line: usize,
 }
 
-impl<'a> fmt::Display for Token<'a> {
+impl<'src> fmt::Display for Token<'src> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {} {:?}", self.type_, self.lexeme, self.literal)
+        write!(f, "{:?} {}", self.type_, self.lexeme)
     }
 }
 

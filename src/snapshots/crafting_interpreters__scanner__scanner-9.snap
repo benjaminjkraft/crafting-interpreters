@@ -7,15 +7,11 @@ Ok(
         Token {
             type_: Number,
             lexeme: "1",
-            literal: Number(
-                1.0,
-            ),
             line: 1,
         },
         Token {
             type_: EOF,
             lexeme: "",
-            literal: Nil,
             line: 1,
         },
     ],

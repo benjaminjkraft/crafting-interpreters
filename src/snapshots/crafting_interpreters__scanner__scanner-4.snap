@@ -7,7 +7,6 @@ Ok(
         Token {
             type_: EOF,
             lexeme: "",
-            literal: Nil,
             line: 1,
         },
     ],

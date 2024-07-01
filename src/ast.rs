@@ -3,118 +3,118 @@ use crate::scanner;
 use derive_more::From;
 
 #[derive(Debug)]
-pub struct Program<'a> {
-    pub stmts: Vec<Stmt<'a>>,
+pub struct Program<'src> {
+    pub stmts: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug, From)]
-pub enum Expr<'a> {
-    Assign(AssignExpr<'a>),
-    Binary(BinaryExpr<'a>),
-    Call(CallExpr<'a>),
-    Grouping(GroupingExpr<'a>),
-    Literal(LiteralExpr<'a>),
-    Logical(LogicalExpr<'a>),
-    Unary(UnaryExpr<'a>),
-    Variable(VariableExpr<'a>),
+pub enum Expr<'src> {
+    Assign(AssignExpr<'src>),
+    Binary(BinaryExpr<'src>),
+    Call(CallExpr<'src>),
+    Grouping(GroupingExpr<'src>),
+    Literal(LiteralExpr),
+    Logical(LogicalExpr<'src>),
+    Unary(UnaryExpr<'src>),
+    Variable(VariableExpr<'src>),
 }
 
 #[derive(Debug, From)]
-pub enum Stmt<'a> {
-    Block(BlockStmt<'a>),
-    Expr(ExprStmt<'a>),
-    Function(FunctionStmt<'a>),
-    If(IfStmt<'a>),
-    Print(PrintStmt<'a>),
-    Var(VarStmt<'a>),
-    While(WhileStmt<'a>),
+pub enum Stmt<'src> {
+    Block(BlockStmt<'src>),
+    Expr(ExprStmt<'src>),
+    Function(FunctionStmt<'src>),
+    If(IfStmt<'src>),
+    Print(PrintStmt<'src>),
+    Var(VarStmt<'src>),
+    While(WhileStmt<'src>),
 }
 
 #[derive(Debug)]
-pub struct AssignExpr<'a> {
-    pub name: scanner::Token<'a>,
-    pub value: Box<Expr<'a>>,
+pub struct AssignExpr<'src> {
+    pub name: scanner::Token<'src>,
+    pub value: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct BinaryExpr<'a> {
-    pub left: Box<Expr<'a>>,
-    pub operator: scanner::Token<'a>,
-    pub right: Box<Expr<'a>>,
+pub struct BinaryExpr<'src> {
+    pub left: Box<Expr<'src>>,
+    pub operator: scanner::Token<'src>,
+    pub right: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct CallExpr<'a> {
-    pub callee: Box<Expr<'a>>,
-    pub paren: scanner::Token<'a>,
-    pub arguments: Vec<Expr<'a>>,
+pub struct CallExpr<'src> {
+    pub callee: Box<Expr<'src>>,
+    pub paren: scanner::Token<'src>,
+    pub arguments: Vec<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct GroupingExpr<'a> {
-    pub expr: Box<Expr<'a>>,
+pub struct GroupingExpr<'src> {
+    pub expr: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct LiteralExpr<'a> {
-    pub value: object::Object<'a>,
+pub struct LiteralExpr {
+    pub value: object::Literal,
 }
 
 #[derive(Debug)]
-pub struct LogicalExpr<'a> {
-    pub left: Box<Expr<'a>>,
-    pub operator: scanner::Token<'a>,
-    pub right: Box<Expr<'a>>,
+pub struct LogicalExpr<'src> {
+    pub left: Box<Expr<'src>>,
+    pub operator: scanner::Token<'src>,
+    pub right: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct UnaryExpr<'a> {
-    pub operator: scanner::Token<'a>,
-    pub right: Box<Expr<'a>>,
+pub struct UnaryExpr<'src> {
+    pub operator: scanner::Token<'src>,
+    pub right: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct VariableExpr<'a> {
-    pub name: scanner::Token<'a>,
+pub struct VariableExpr<'src> {
+    pub name: scanner::Token<'src>,
 }
 
 #[derive(Debug)]
-pub struct BlockStmt<'a> {
-    pub stmts: Vec<Stmt<'a>>,
+pub struct BlockStmt<'src> {
+    pub stmts: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug)]
-pub struct ExprStmt<'a> {
-    pub expr: Box<Expr<'a>>,
+pub struct ExprStmt<'src> {
+    pub expr: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct FunctionStmt<'a> {
-    pub name: scanner::Token<'a>,
-    pub parameters: Vec<scanner::Token<'a>>,
-    pub body: Vec<Stmt<'a>>,
+pub struct FunctionStmt<'src> {
+    pub name: scanner::Token<'src>,
+    pub parameters: Vec<scanner::Token<'src>>,
+    pub body: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug)]
-pub struct IfStmt<'a> {
-    pub condition: Box<Expr<'a>>,
-    pub then_: Box<Stmt<'a>>,
-    pub else_: Option<Box<Stmt<'a>>>,
+pub struct IfStmt<'src> {
+    pub condition: Box<Expr<'src>>,
+    pub then_: Box<Stmt<'src>>,
+    pub else_: Option<Box<Stmt<'src>>>,
 }
 
 #[derive(Debug)]
-pub struct PrintStmt<'a> {
-    pub expr: Box<Expr<'a>>,
+pub struct PrintStmt<'src> {
+    pub expr: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
-pub struct VarStmt<'a> {
-    pub name: scanner::Token<'a>,
-    pub initializer: Option<Box<Expr<'a>>>,
+pub struct VarStmt<'src> {
+    pub name: scanner::Token<'src>,
+    pub initializer: Option<Box<Expr<'src>>>,
 }
 
 #[derive(Debug)]
-pub struct WhileStmt<'a> {
-    pub condition: Box<Expr<'a>>,
-    pub body: Box<Stmt<'a>>,
+pub struct WhileStmt<'src> {
+    pub condition: Box<Expr<'src>>,
+    pub body: Box<Stmt<'src>>,
 }

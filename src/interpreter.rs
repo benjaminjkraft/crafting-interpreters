@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
-use crate::object::{Function, Object};
+use crate::object::{Function, Literal, Object};
 use crate::parser;
 use crate::scanner;
 use crate::scanner::TokenType;
@@ -9,21 +9,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time;
 
-pub struct Interpreter<'a, F: FnMut(String)> {
+pub struct Interpreter<'ast, 'src: 'ast, F: FnMut(String)> {
     // TODO: define printer as a global (even if it's still a magic statement)?
     printer: F,
-    globals: Rc<RefCell<Environment<'a>>>,
-    environment: Rc<RefCell<Environment<'a>>>,
+    globals: Rc<RefCell<Environment<'ast, 'src>>>,
+    environment: Rc<RefCell<Environment<'ast, 'src>>>,
 }
 
-fn now_sec<'a>() -> Result<Object<'a>, LoxError> {
+fn now_sec<'ast, 'src: 'ast>() -> Result<Object<'ast, 'src>, LoxError> {
     match time::SystemTime::now().duration_since(time::UNIX_EPOCH) {
-        Ok(t) => Ok(Object::Number(t.as_secs_f64())),
+        Ok(t) => Ok(Object::Literal(Literal::Number(t.as_secs_f64()))),
         Err(e) => panic!("{}", e),
     }
 }
 
-pub fn interpreter<'a>() -> Interpreter<'a, impl FnMut(String)> {
+pub fn interpreter<'ast, 'src: 'ast>() -> Interpreter<'ast, 'src, impl FnMut(String)> {
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
@@ -40,12 +40,12 @@ pub fn interpreter<'a>() -> Interpreter<'a, impl FnMut(String)> {
     }
 }
 
-impl<'a, F: FnMut(String)> Interpreter<'a, F> {
-    pub fn execute_program(&mut self, node: &'a Program<'a>) -> Result<(), LoxError> {
+impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
+    pub fn execute_program(&mut self, node: &'ast Program<'src>) -> Result<(), LoxError> {
         self.execute_stmts(&node.stmts, self.environment.clone())
     }
 
-    fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object<'a>, LoxError> {
+    fn evaluate(&mut self, node: &Expr<'src>) -> Result<Object<'ast, 'src>, LoxError> {
         match node {
             Expr::Assign(node) => {
                 let value = self.evaluate(&node.value)?;
@@ -60,40 +60,67 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
 
                 match node.operator.type_ {
                     TokenType::Minus => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l - r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Number(l - r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for subtraction"),
                     },
                     TokenType::Plus => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l + r)),
-                        (Object::String(l), Object::String(r)) => Ok(Object::String(l + &r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Number(l + r))),
+                        (
+                            Object::Literal(Literal::String(l)),
+                            Object::Literal(Literal::String(r)),
+                        ) => Ok(Object::Literal(Literal::String(l + &r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for addition"),
                     },
                     TokenType::Slash => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l / r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Number(l / r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for division"),
                     },
                     TokenType::Star => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l * r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Number(l * r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for multiplication"),
                     },
                     TokenType::Greater => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l > r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Bool(l > r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::GreaterEqual => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l >= r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Bool(l >= r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::Less => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l < r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Bool(l < r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::LessEqual => match (left, right) {
-                        (Object::Number(l), Object::Number(r)) => Ok(Object::Bool(l <= r)),
+                        (
+                            Object::Literal(Literal::Number(l)),
+                            Object::Literal(Literal::Number(r)),
+                        ) => Ok(Object::Literal(Literal::Bool(l <= r))),
                         (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
                     },
-                    TokenType::EqualEqual => Ok(Object::Bool(left.eq(&right))),
-                    TokenType::BangEqual => Ok(Object::Bool(!left.eq(&right))),
+                    TokenType::EqualEqual => Ok(Object::Literal(Literal::Bool(left.eq(&right)))),
+                    TokenType::BangEqual => Ok(Object::Literal(Literal::Bool(!left.eq(&right)))),
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
@@ -139,7 +166,7 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
                                     .define(parameter.lexeme, arguments[i].clone());
                             }
                             self.execute_stmts(&f.body, environment)?;
-                            Ok(Object::Nil) // TODO: return
+                            Ok(Object::Literal(Literal::Nil)) // TODO: return
                         }
                     }
                     o => runtime_error(
@@ -149,7 +176,7 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
                 }
             }
             Expr::Grouping(node) => self.evaluate(&node.expr),
-            Expr::Literal(node) => Ok(node.value.clone()),
+            Expr::Literal(node) => Ok(Object::Literal(node.value.clone())),
             Expr::Logical(node) => {
                 let left = self.evaluate(&node.left)?;
                 match (node.operator.type_, left.is_truthy()) {
@@ -162,9 +189,11 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
                 let right = self.evaluate(&node.right)?;
 
                 match node.operator.type_ {
-                    TokenType::Bang => Ok(Object::Bool(!right.is_truthy())),
+                    TokenType::Bang => Ok(Object::Literal(Literal::Bool(!right.is_truthy()))),
                     TokenType::Minus => match right {
-                        Object::Number(n) => Ok(Object::Number(-n)),
+                        Object::Literal(Literal::Number(n)) => {
+                            Ok(Object::Literal(Literal::Number(-n)))
+                        }
                         _ => runtime_error(&node.operator, "invalid type for negation"),
                     },
                     _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
@@ -176,8 +205,8 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
 
     fn execute_stmts(
         &mut self,
-        stmts: &'a Vec<Stmt<'a>>,
-        environment: Rc<RefCell<Environment<'a>>>,
+        stmts: &'ast Vec<Stmt<'src>>,
+        environment: Rc<RefCell<Environment<'ast, 'src>>>,
     ) -> Result<(), LoxError> {
         let prev = self.environment.clone();
         self.environment = environment;
@@ -188,11 +217,11 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
         Ok(())
     }
 
-    fn child_environment(&self) -> Rc<RefCell<Environment<'a>>> {
+    fn child_environment(&self) -> Rc<RefCell<Environment<'ast, 'src>>> {
         Rc::new(RefCell::new(Environment::child(self.environment.clone())))
     }
 
-    fn execute(&mut self, node: &'a Stmt<'a>) -> Result<(), LoxError> {
+    fn execute(&mut self, node: &'ast Stmt<'src>) -> Result<(), LoxError> {
         match node {
             Stmt::Block(node) => {
                 let environment = self.child_environment();
@@ -229,7 +258,7 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
             Stmt::Var(node) => {
                 let value = match &node.initializer {
                     Some(expr) => self.evaluate(&expr)?,
-                    None => Object::Nil,
+                    None => Object::Literal(Literal::Nil),
                 };
 
                 self.environment
@@ -252,27 +281,28 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
 pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let mut printed: Vec<String> = Vec::new();
     let mut time = 0.0;
-    let globals = Rc::new(RefCell::new(Environment::new()));
-    globals.borrow_mut().define(
-        "clock",
-        Object::BuiltinFunction(Function {
-            arity: 0,
-            function: Rc::new(RefCell::new(move |_| {
-                time += 1.0;
-                Ok(Object::Number(time))
-            })),
-            name: "clock".to_string(),
-        }),
-    );
     let tokens = scanner::scan_tokens(source)?;
     let prog = parser::parse(tokens)?;
-    let mut interpreter = Interpreter {
-        printer: |s| printed.push(s),
-        globals: globals.clone(),
-        environment: globals.clone(),
-    };
-    // TODO: no really this leak is bad, redo all the lifetimes
-    interpreter.execute_program(Box::leak(Box::new(prog)))?;
+    {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+        globals.borrow_mut().define(
+            "clock",
+            Object::BuiltinFunction(Function {
+                arity: 0,
+                function: Rc::new(RefCell::new(move |_| {
+                    time += 1.0;
+                    Ok(Object::Literal(Literal::Number(time)))
+                })),
+                name: "clock".to_string(),
+            }),
+        );
+        let mut interpreter = Interpreter {
+            printer: |s| printed.push(s),
+            globals: globals.clone(),
+            environment: globals.clone(),
+        };
+        interpreter.execute_program(&prog)?;
+    }
     Ok(printed)
 }
 
