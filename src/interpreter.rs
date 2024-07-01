@@ -245,11 +245,8 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 let cond = self.evaluate(&node.condition)?;
                 if cond.is_truthy() {
                     self.execute(&node.then_)?;
-                } else {
-                    match &node.else_ {
-                        Some(e) => self.execute(e)?,
-                        None => {}
-                    }
+                } else if let Some(e) = &node.else_ {
+                    self.execute(e)?;
                 }
             }
             Stmt::Print(node) => {
