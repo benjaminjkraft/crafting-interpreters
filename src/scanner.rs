@@ -144,7 +144,7 @@ impl<'a> Scanner<'a> {
         self.token_literal(type_, Object::Nil)
     }
 
-    fn token_literal(&self, type_: TokenType, literal: Object) -> Option<Token<'a>> {
+    fn token_literal(&self, type_: TokenType, literal: Object<'a>) -> Option<Token<'a>> {
         Some(Token {
             type_,
             lexeme: &self.source[self.start..self.current],
@@ -216,7 +216,7 @@ pub fn scan_tokens<'a>(source: &'a str) -> Result<Vec<Token<'a>>, LoxError> {
 pub struct Token<'a> {
     pub type_: TokenType,
     pub lexeme: &'a str,
-    pub literal: object::Object,
+    pub literal: object::Object<'a>,
     pub line: usize,
 }
 

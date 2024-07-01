@@ -13,7 +13,7 @@ pub enum Expr<'a> {
     Binary(BinaryExpr<'a>),
     Call(CallExpr<'a>),
     Grouping(GroupingExpr<'a>),
-    Literal(LiteralExpr),
+    Literal(LiteralExpr<'a>),
     Logical(LogicalExpr<'a>),
     Unary(UnaryExpr<'a>),
     Variable(VariableExpr<'a>),
@@ -56,8 +56,8 @@ pub struct GroupingExpr<'a> {
 }
 
 #[derive(Debug)]
-pub struct LiteralExpr {
-    pub value: object::Object,
+pub struct LiteralExpr<'a> {
+    pub value: object::Object<'a>,
 }
 
 #[derive(Debug)]

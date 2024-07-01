@@ -9,21 +9,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time;
 
-pub struct Interpreter<F: FnMut(String)> {
+pub struct Interpreter<'a, F: FnMut(String)> {
     // TODO: define printer as a global (even if it's still a magic statement)?
     printer: F,
-    globals: Rc<RefCell<Environment>>,
-    environment: Rc<RefCell<Environment>>,
+    globals: Rc<RefCell<Environment<'a>>>,
+    environment: Rc<RefCell<Environment<'a>>>,
 }
 
-fn now_sec() -> Result<Object, LoxError> {
+fn now_sec<'a>() -> Result<Object<'a>, LoxError> {
     match time::SystemTime::now().duration_since(time::UNIX_EPOCH) {
         Ok(t) => Ok(Object::Number(t.as_secs_f64())),
         Err(e) => panic!("{}", e),
     }
 }
 
-pub fn interpreter() -> Interpreter<impl FnMut(String)> {
+pub fn interpreter<'a>() -> Interpreter<'a, impl FnMut(String)> {
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
@@ -40,9 +40,9 @@ pub fn interpreter() -> Interpreter<impl FnMut(String)> {
     }
 }
 
-pub fn evaluate_source<F: FnMut(String)>(
-    interpreter: &mut Interpreter<F>,
-    source: &str,
+pub fn evaluate_source<'a, F: FnMut(String)>(
+    interpreter: &mut Interpreter<'a, F>,
+    source: &'a str,
 ) -> Result<(), LoxError> {
     let tokens = scanner::scan_tokens(source)?;
     let prog = parser::parse(tokens)?;
@@ -50,12 +50,12 @@ pub fn evaluate_source<F: FnMut(String)>(
     Ok(())
 }
 
-impl<'a, F: FnMut(String)> Interpreter<F> {
+impl<'a, F: FnMut(String)> Interpreter<'a, F> {
     fn execute_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
         self.execute_stmts(&node.stmts)
     }
 
-    fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object, LoxError> {
+    fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object<'a>, LoxError> {
         match node {
             Expr::Assign(node) => {
                 let value = self.evaluate(&node.value)?;
@@ -130,6 +130,7 @@ impl<'a, F: FnMut(String)> Interpreter<F> {
                             (f.function.borrow_mut())(arguments)
                         }
                     }
+                    Object::Function(f) => todo!(),
                     o => runtime_error(
                         &node.paren,
                         &format!("Can only call functions and classes, got '{}'.", o),

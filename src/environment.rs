@@ -6,12 +6,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct Environment {
-    values: HashMap<String, Object>,
-    enclosing: Option<Rc<RefCell<Environment>>>,
+pub struct Environment<'a> {
+    values: HashMap<String, Object<'a>>,
+    enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
-impl<'a> Environment {
+impl<'a> Environment<'a> {
     pub fn new() -> Self {
         Self {
             values: HashMap::new(),
@@ -19,18 +19,18 @@ impl<'a> Environment {
         }
     }
 
-    pub fn child(inner: Rc<RefCell<Environment>>) -> Self {
+    pub fn child(inner: Rc<RefCell<Environment<'a>>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing: Some(inner),
         }
     }
 
-    pub fn define(&mut self, name: &'a str, value: Object) {
+    pub fn define(&mut self, name: &'a str, value: Object<'a>) {
         self.values.insert(name.to_string(), value);
     }
 
-    pub fn get(&self, name: &scanner::Token<'a>) -> Result<Object, LoxError> {
+    pub fn get(&self, name: &scanner::Token<'a>) -> Result<Object<'a>, LoxError> {
         match (self.values.get(name.lexeme), &self.enclosing) {
             (Some(obj), _) => Ok(obj.clone()),
             (None, Some(enclosing)) => enclosing.borrow().get(name),
@@ -38,7 +38,7 @@ impl<'a> Environment {
         }
     }
 
-    pub fn assign(&mut self, name: &scanner::Token<'a>, value: Object) -> Result<(), LoxError> {
+    pub fn assign(&mut self, name: &scanner::Token<'a>, value: Object<'a>) -> Result<(), LoxError> {
         if self.values.contains_key(name.lexeme) {
             Ok(self.define(name.lexeme, value))
         } else {
