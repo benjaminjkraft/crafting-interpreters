@@ -75,18 +75,23 @@ fn print_stmt<'src>(node: &Stmt<'src>) -> String {
                 print_expr(&node.condition),
                 print_stmt(&node.then_),
             ];
-            match &node.else_ {
-                Some(e) => parts.push(print_stmt(e)),
-                None => {}
+            if let Some(e) = &node.else_ {
+                parts.push(print_stmt(e))
             }
             parenthesize(parts)
         }
         Stmt::Print(node) => parenthesize(&["print", &print_expr(&node.expr)]),
+        Stmt::Return(node) => {
+            let mut parts = vec!["return".to_string()];
+            if let Some(e) = &node.value {
+                parts.push(print_expr(e))
+            }
+            parenthesize(parts)
+        }
         Stmt::Var(node) => {
             let mut parts = vec!["var".to_string(), node.name.lexeme.to_string()];
-            match &node.initializer {
-                Some(e) => parts.push(print_expr(e)),
-                None => {}
+            if let Some(e) = &node.initializer {
+                parts.push(print_expr(e))
             }
             parenthesize(parts)
         }

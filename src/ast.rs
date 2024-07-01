@@ -26,6 +26,7 @@ pub enum Stmt<'src> {
     Function(FunctionStmt<'src>),
     If(IfStmt<'src>),
     Print(PrintStmt<'src>),
+    Return(ReturnStmt<'src>),
     Var(VarStmt<'src>),
     While(WhileStmt<'src>),
 }
@@ -105,6 +106,12 @@ pub struct IfStmt<'src> {
 #[derive(Debug)]
 pub struct PrintStmt<'src> {
     pub expr: Box<Expr<'src>>,
+}
+
+#[derive(Debug)]
+pub struct ReturnStmt<'src> {
+    pub keyword: scanner::Token<'src>,
+    pub value: Option<Box<Expr<'src>>>,
 }
 
 #[derive(Debug)]

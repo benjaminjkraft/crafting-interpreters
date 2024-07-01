@@ -78,6 +78,8 @@ impl<'src> Parser<'src> {
             self.for_statement()
         } else if self.match_(&[TokenType::Print]) {
             self.print_statement()
+        } else if self.match_(&[TokenType::Return]) {
+            self.return_statement()
         } else {
             self.expression_statement()
         }
@@ -90,6 +92,17 @@ impl<'src> Parser<'src> {
             expr: Box::new(value),
         }
         .into())
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt<'src>, LoxError> {
+        let keyword = self.previous();
+        let value = if self.check(TokenType::Semicolon) {
+            None
+        } else {
+            Some(Box::new(self.expression()?))
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(ReturnStmt { keyword, value }.into())
     }
 
     fn if_statement(&mut self) -> Result<Stmt<'src>, LoxError> {
@@ -719,4 +732,10 @@ fn test_parser_function() {
         "fun f(a);",
         &["[line 1] Error at ';': Expect '{' before function body."],
     );
+}
+
+#[test]
+fn test_parser_return() {
+    assert_parses_to("fun f() { return 3; }", "(fun f (\n\t(return (3))\n))");
+    assert_parses_to("fun f() { return; }", "(fun f (\n\t(return)\n))");
 }

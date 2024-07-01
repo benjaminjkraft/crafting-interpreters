@@ -257,6 +257,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 let stringified = format!("{}", value);
                 (self.printer)(stringified);
             }
+            Stmt::Return(node) => todo!(),
             Stmt::Var(node) => {
                 let value = match &node.initializer {
                     Some(expr) => self.evaluate(expr)?,
