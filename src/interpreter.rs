@@ -157,25 +157,29 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             Unwinder::promote((f.function.borrow_mut())(arguments))
                         }
                     }
-                    Object::Function(f) => {
-                        let environment = self.child_environment();
-                        if f.parameters.len() != arguments.len() {
+                    Object::Function {
+                        declaration,
+                        closure,
+                    } => {
+                        let environment =
+                            Rc::new(RefCell::new(Environment::child(closure.clone())));
+                        if declaration.parameters.len() != arguments.len() {
                             // TODO: duplicated a bit
                             Unwinder::err(
                                 &node.paren,
                                 &format!(
                                     "Expected {} arguments but got {}.",
-                                    f.parameters.len(),
+                                    declaration.parameters.len(),
                                     arguments.len()
                                 ),
                             )
                         } else {
-                            for (i, parameter) in f.parameters.iter().enumerate() {
+                            for (i, parameter) in declaration.parameters.iter().enumerate() {
                                 environment
                                     .borrow_mut()
                                     .define(parameter.lexeme, arguments[i].clone());
                             }
-                            let result = self.execute_stmts(&f.body, environment);
+                            let result = self.execute_stmts(&declaration.body, environment);
                             let r = match result {
                                 Ok(()) => Ok(Object::Literal(Literal::Nil)), // (omitted return)
                                 Err(Unwinder::Err(e)) => Err(Unwinder::Err(e)),
@@ -235,14 +239,11 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         Ok(())
     }
 
-    fn child_environment(&self) -> Rc<RefCell<Environment<'ast, 'src>>> {
-        Rc::new(RefCell::new(Environment::child(self.environment.clone())))
-    }
-
     fn execute(&mut self, node: &'ast Stmt<'src>) -> Result<(), Unwinder<'ast, 'src>> {
         match node {
             Stmt::Block(node) => {
-                let environment = self.child_environment();
+                let environment =
+                    Rc::new(RefCell::new(Environment::child(self.environment.clone())));
                 self.execute_stmts(&node.stmts, environment)?;
             }
 
@@ -251,7 +252,10 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Function(node) => {
-                let function = Object::Function(node);
+                let function = Object::Function {
+                    declaration: node,
+                    closure: self.environment.clone(),
+                };
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, function);
@@ -605,5 +609,29 @@ fn test_returns() {
     assert_errs(
         "if (true) return 3;",
         "[line 1] Error: Can't return from top-level code.",
+    );
+}
+
+#[test]
+fn test_closures() {
+    assert_prints(
+        r"
+            fun makeCounter() {
+                var i = 0;
+                fun count() {
+                    i = i + 1;
+                    return i;
+                }
+
+                return count;
+            }
+            var counter1 = makeCounter();
+            var counter2 = makeCounter();
+            print counter1();
+            print counter1();
+            print counter2();
+            print counter2();
+        ",
+        &["1", "2", "1", "2"],
     );
 }

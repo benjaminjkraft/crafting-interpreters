@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::environment::Environment;
 use crate::error::LoxError;
 use std::cell::RefCell;
 use std::fmt;
@@ -39,7 +40,10 @@ impl Literal {
 pub enum Object<'ast, 'src: 'ast> {
     Literal(Literal),
     BuiltinFunction(Function<'ast, 'src>),
-    Function(&'ast ast::FunctionStmt<'src>),
+    Function {
+        declaration: &'ast ast::FunctionStmt<'src>,
+        closure: Rc<RefCell<Environment<'ast, 'src>>>,
+    },
 }
 
 #[derive(Clone)]
@@ -67,7 +71,10 @@ impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
         match self {
             Object::Literal(v) => write!(f, "{}", v),
             Object::BuiltinFunction(v) => v.fmt(f),
-            Object::Function(stmt) => write!(f, "<function {}>", stmt.name.lexeme),
+            Object::Function {
+                declaration,
+                closure: _,
+            } => write!(f, "<function {}>", declaration.name.lexeme),
         }
     }
 }
@@ -90,7 +97,16 @@ impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
                 l.arity == r.arity && Rc::ptr_eq(&l.function, &r.function) && l.name == r.name
             }
             (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
-            (Object::Function(l), Object::Function(r)) => ptr::eq(l, r),
+            (
+                Object::Function {
+                    declaration: l,
+                    closure: _,
+                },
+                Object::Function {
+                    declaration: r,
+                    closure: _,
+                },
+            ) => ptr::eq(l, r),
             // (Object::Function(_), _) | (_, Object::Function(_)) => false,
         }
     }
