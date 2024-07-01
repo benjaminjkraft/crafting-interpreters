@@ -16,9 +16,8 @@ impl<'src> Scanner<'src> {
         let mut tokens = Vec::new();
         while !self.is_at_end() {
             self.start = self.current;
-            match self.scan_token()? {
-                Some(tok) => tokens.push(tok),
-                None => {}
+            if let Some(tok) = self.scan_token()? {
+                tokens.push(tok);
             }
         }
 
@@ -176,15 +175,15 @@ impl<'src> Scanner<'src> {
 }
 
 fn is_digit(c: u8) -> bool {
-    return c >= b'0' && c <= b'9';
+    c >= b'0' && c <= b'9'
 }
 
 fn is_alpha(c: u8) -> bool {
-    return c >= b'a' && c <= b'z' || c >= b'A' && c <= b'Z' || c == b'_';
+    c >= b'a' && c <= b'z' || c >= b'A' && c <= b'Z' || c == b'_'
 }
 
 fn is_alpha_numeric(c: u8) -> bool {
-    return is_digit(c) || is_alpha(c);
+    is_digit(c) || is_alpha(c)
 }
 
 pub fn scan_tokens<'src>(source: &'src str) -> Result<Vec<Token<'src>>, LoxError> {

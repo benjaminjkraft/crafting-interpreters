@@ -26,10 +26,7 @@ impl From<Vec<LoxError>> for LoxError {
         first.message = format!(
             "{}\n{}",
             first.message,
-            value[1..]
-                .into_iter()
-                .map(|err| format!("{}", err))
-                .join("\n")
+            value[1..].iter().map(|err| format!("{}", err)).join("\n")
         );
         first
     }

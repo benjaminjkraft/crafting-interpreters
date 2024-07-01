@@ -44,7 +44,8 @@ impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
         value: Object<'ast, 'src>,
     ) -> Result<(), LoxError> {
         if self.values.contains_key(name.lexeme) {
-            Ok(self.define(name.lexeme, value))
+            self.define(name.lexeme, value);
+            Ok(())
         } else {
             match &self.enclosing {
                 Some(enclosing) => enclosing.borrow_mut().assign(name, value),
@@ -55,5 +56,5 @@ impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
 }
 
 fn undefined<'ast, 'src: 'ast, T>(name: &scanner::Token<'src>) -> Result<T, LoxError> {
-    error::runtime_error(&name, &format!("Undefined variable '{}'.", name.lexeme))
+    error::runtime_error(name, &format!("Undefined variable '{}'.", name.lexeme))
 }

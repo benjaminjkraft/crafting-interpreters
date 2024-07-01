@@ -232,10 +232,7 @@ impl<'src> Parser<'src> {
                 }
             }
         }
-        self.consume(
-            TokenType::RightParen,
-            &format!("Expect ')' after parameters."),
-        )?;
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.consume(
             TokenType::LeftBrace,
             &format!("Expect '{{' before {} body.", kind),
@@ -259,7 +256,7 @@ impl<'src> Parser<'src> {
         next: &mut dyn FnMut(&mut Self) -> Result<Expr<'src>, LoxError>,
     ) -> Result<Expr<'src>, LoxError> {
         let mut expr = next(self)?;
-        while self.match_(&tokens) {
+        while self.match_(tokens) {
             let operator = self.previous();
             let right = next(self)?;
             expr = BinaryExpr {
@@ -456,7 +453,7 @@ impl<'src> Parser<'src> {
     }
 
     fn match_(&mut self, types: &[TokenType]) -> bool {
-        types.into_iter().any(|type_| {
+        types.iter().any(|type_| {
             if self.check(*type_) {
                 self.advance();
                 true

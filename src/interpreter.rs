@@ -2,7 +2,9 @@ use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
 use crate::object::{Function, Literal, Object};
+#[cfg(test)]
 use crate::parser;
+#[cfg(test)]
 use crate::scanner;
 use crate::scanner::TokenType;
 use std::cell::RefCell;
@@ -129,7 +131,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
 
                 let mut arguments = Vec::new();
                 for argument in &node.arguments {
-                    arguments.push(self.evaluate(&argument)?);
+                    arguments.push(self.evaluate(argument)?);
                 }
 
                 match callee {
@@ -211,7 +213,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         let prev = self.environment.clone();
         self.environment = environment;
         for stmt in stmts {
-            self.execute(&stmt)?;
+            self.execute(stmt)?;
         }
         self.environment = prev;
         Ok(())
@@ -233,7 +235,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Function(node) => {
-                let function = Object::Function(&node);
+                let function = Object::Function(node);
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, function);
@@ -257,7 +259,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
             Stmt::Var(node) => {
                 let value = match &node.initializer {
-                    Some(expr) => self.evaluate(&expr)?,
+                    Some(expr) => self.evaluate(expr)?,
                     None => Object::Literal(Literal::Nil),
                 };
 
