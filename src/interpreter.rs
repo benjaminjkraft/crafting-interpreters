@@ -490,6 +490,16 @@ fn test_functions() {
         "fun count(n) { if (n > 1) count(n-1); print n; } count(3);",
         &["1", "2", "3"],
     );
+    assert_prints(
+        r#"
+            fun sayHi(first, last) {
+                print "Hi, " + first + " " + last + "!";
+            }
+
+            sayHi("Dear", "Reader");
+        "#,
+        &["Hi, Dear Reader!"],
+    );
 
     assert_errs(
         "fun f(n) {} print f(1, 2);",
