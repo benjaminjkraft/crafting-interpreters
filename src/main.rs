@@ -12,6 +12,7 @@ mod interpreter;
 mod object;
 mod parser;
 mod scanner;
+mod unwind;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();

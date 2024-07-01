@@ -46,11 +46,11 @@ pub fn parse_error(token: scanner::Token, message: &str) -> LoxError {
     }
 }
 
-pub fn runtime_error<T>(token: &scanner::Token, message: &str) -> Result<T, LoxError> {
-    Err(LoxError {
+pub fn runtime_error(token: &scanner::Token, message: &str) -> LoxError {
+    LoxError {
         line: token.line,
         loc: "".to_string(),
         exit: 70,
         message: message.to_string(),
-    })
+    }
 }

@@ -1,14 +1,39 @@
-use crate::error;
-use crate::error::LoxError;
 use crate::object::Object;
 use crate::scanner;
+use crate::unwind::Unwinder;
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 
 pub struct Environment<'ast, 'src: 'ast> {
     values: HashMap<String, Object<'ast, 'src>>,
     enclosing: Option<Rc<RefCell<Environment<'ast, 'src>>>>,
+}
+
+impl Environment<'_, '_> {
+    fn fmt_indented(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+        if depth == 0 {
+            write!(f, "===================== environment =====================")?;
+        }
+        for (k, v) in &self.values {
+            write!(f, "{}{} = {}\n", "\t".repeat(depth), k, v)?;
+        }
+        if let Some(next) = &self.enclosing {
+            next.borrow().fmt_indented(f, depth + 1)?;
+        }
+        if depth == 0 {
+            write!(f, "=======================================================")?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Environment<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_indented(f, 0)
+    }
 }
 
 impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
@@ -30,7 +55,10 @@ impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
         self.values.insert(name.to_string(), value);
     }
 
-    pub fn get(&self, name: &scanner::Token<'src>) -> Result<Object<'ast, 'src>, LoxError> {
+    pub fn get(
+        &self,
+        name: &scanner::Token<'src>,
+    ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
         match (self.values.get(name.lexeme), &self.enclosing) {
             (Some(obj), _) => Ok(obj.clone()),
             (None, Some(enclosing)) => enclosing.borrow().get(name),
@@ -42,7 +70,7 @@ impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
         &mut self,
         name: &scanner::Token<'src>,
         value: Object<'ast, 'src>,
-    ) -> Result<(), LoxError> {
+    ) -> Result<(), Unwinder<'ast, 'src>> {
         if self.values.contains_key(name.lexeme) {
             self.define(name.lexeme, value);
             Ok(())
@@ -55,6 +83,6 @@ impl<'ast, 'src: 'ast> Environment<'ast, 'src> {
     }
 }
 
-fn undefined<'ast, 'src: 'ast, T>(name: &scanner::Token<'src>) -> Result<T, LoxError> {
-    error::runtime_error(name, &format!("Undefined variable '{}'.", name.lexeme))
+fn undefined<'ast, 'src: 'ast, T>(name: &scanner::Token<'src>) -> Result<T, Unwinder<'ast, 'src>> {
+    Unwinder::err(name, &format!("Undefined variable '{}'.", name.lexeme))
 }

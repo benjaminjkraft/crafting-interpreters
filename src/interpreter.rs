@@ -7,6 +7,7 @@ use crate::parser;
 #[cfg(test)]
 use crate::scanner;
 use crate::scanner::TokenType;
+use crate::unwind::Unwinder;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time;
@@ -44,10 +45,17 @@ pub fn interpreter<'ast, 'src: 'ast>() -> Interpreter<'ast, 'src, impl FnMut(Str
 
 impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
     pub fn execute_program(&mut self, node: &'ast Program<'src>) -> Result<(), LoxError> {
-        self.execute_stmts(&node.stmts, self.environment.clone())
+        let result = self.execute_stmts(&node.stmts, self.environment.clone());
+        match result {
+            Ok(()) => Ok(()),
+            Err(Unwinder::Err(e)) => Err(e),
+            Err(Unwinder::Return { keyword, value: _ }) => {
+                Err(runtime_error(&keyword, "Can't return from top-level code."))
+            }
+        }
     }
 
-    fn evaluate(&mut self, node: &Expr<'src>) -> Result<Object<'ast, 'src>, LoxError> {
+    fn evaluate(&mut self, node: &Expr<'src>) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
         match node {
             Expr::Assign(node) => {
                 let value = self.evaluate(&node.value)?;
@@ -66,7 +74,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Number(l - r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for subtraction"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for subtraction"),
                     },
                     TokenType::Plus => match (left, right) {
                         (
@@ -77,53 +85,53 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             Object::Literal(Literal::String(l)),
                             Object::Literal(Literal::String(r)),
                         ) => Ok(Object::Literal(Literal::String(l + &r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for addition"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for addition"),
                     },
                     TokenType::Slash => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Number(l / r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for division"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for division"),
                     },
                     TokenType::Star => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Number(l * r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for multiplication"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for multiplication"),
                     },
                     TokenType::Greater => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Bool(l > r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::GreaterEqual => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Bool(l >= r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::Less => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Bool(l < r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::LessEqual => match (left, right) {
                         (
                             Object::Literal(Literal::Number(l)),
                             Object::Literal(Literal::Number(r)),
                         ) => Ok(Object::Literal(Literal::Bool(l <= r))),
-                        (_, _) => runtime_error(&node.operator, "invalid types for comparison"),
+                        (_, _) => Unwinder::err(&node.operator, "invalid types for comparison"),
                     },
                     TokenType::EqualEqual => Ok(Object::Literal(Literal::Bool(left.eq(&right)))),
                     TokenType::BangEqual => Ok(Object::Literal(Literal::Bool(!left.eq(&right)))),
-                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                    _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
             Expr::Call(node) => {
@@ -137,7 +145,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 match callee {
                     Object::BuiltinFunction(f) => {
                         if f.arity != arguments.len() {
-                            runtime_error(
+                            Unwinder::err(
                                 &node.paren,
                                 &format!(
                                     "Expected {} arguments but got {}.",
@@ -146,14 +154,14 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                                 ),
                             )
                         } else {
-                            (f.function.borrow_mut())(arguments)
+                            Unwinder::promote((f.function.borrow_mut())(arguments))
                         }
                     }
                     Object::Function(f) => {
                         let environment = self.child_environment();
                         if f.parameters.len() != arguments.len() {
                             // TODO: duplicated a bit
-                            runtime_error(
+                            Unwinder::err(
                                 &node.paren,
                                 &format!(
                                     "Expected {} arguments but got {}.",
@@ -167,11 +175,16 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                                     .borrow_mut()
                                     .define(parameter.lexeme, arguments[i].clone());
                             }
-                            self.execute_stmts(&f.body, environment)?;
-                            Ok(Object::Literal(Literal::Nil)) // TODO: return
+                            let result = self.execute_stmts(&f.body, environment);
+                            let r = match result {
+                                Ok(()) => Ok(Object::Literal(Literal::Nil)), // (omitted return)
+                                Err(Unwinder::Err(e)) => Err(Unwinder::Err(e)),
+                                Err(Unwinder::Return { keyword: _, value }) => Ok(value),
+                            };
+                            r
                         }
                     }
-                    o => runtime_error(
+                    o => Unwinder::err(
                         &node.paren,
                         &format!("Can only call functions and classes, got '{}'.", o),
                     ),
@@ -184,7 +197,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 match (node.operator.type_, left.is_truthy()) {
                     (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
                     (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(&node.right),
-                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                    _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
             Expr::Unary(node) => {
@@ -196,9 +209,9 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                         Object::Literal(Literal::Number(n)) => {
                             Ok(Object::Literal(Literal::Number(-n)))
                         }
-                        _ => runtime_error(&node.operator, "invalid type for negation"),
+                        _ => Unwinder::err(&node.operator, "invalid type for negation"),
                     },
-                    _ => runtime_error(&node.operator, "unknown operator (parser bug?)"),
+                    _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
             Expr::Variable(node) => self.environment.borrow().get(&node.name),
@@ -209,11 +222,14 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         &mut self,
         stmts: &'ast Vec<Stmt<'src>>,
         environment: Rc<RefCell<Environment<'ast, 'src>>>,
-    ) -> Result<(), LoxError> {
+    ) -> Result<(), Unwinder<'ast, 'src>> {
         let prev = self.environment.clone();
         self.environment = environment;
         for stmt in stmts {
-            self.execute(stmt)?;
+            if let Err(e) = self.execute(stmt) {
+                self.environment = prev;
+                return Err(e);
+            }
         }
         self.environment = prev;
         Ok(())
@@ -223,7 +239,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         Rc::new(RefCell::new(Environment::child(self.environment.clone())))
     }
 
-    fn execute(&mut self, node: &'ast Stmt<'src>) -> Result<(), LoxError> {
+    fn execute(&mut self, node: &'ast Stmt<'src>) -> Result<(), Unwinder<'ast, 'src>> {
         match node {
             Stmt::Block(node) => {
                 let environment = self.child_environment();
@@ -254,7 +270,16 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 let stringified = format!("{}", value);
                 (self.printer)(stringified);
             }
-            Stmt::Return(node) => todo!(),
+            Stmt::Return(node) => {
+                let value = match &node.value {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => Object::Literal(Literal::Nil),
+                };
+                Err(Unwinder::Return {
+                    keyword: &node.keyword,
+                    value,
+                })?
+            }
             Stmt::Var(node) => {
                 let value = match &node.initializer {
                     Some(expr) => self.evaluate(expr)?,
@@ -506,5 +531,79 @@ fn test_functions() {
     assert_errs(
         "fun f(n) {} print f();",
         "[line 1] Error: Expected 1 arguments but got 0.",
+    );
+}
+
+#[test]
+fn test_returns() {
+    assert_prints("fun add(a, b) { return a + b; } print add(1, 2);", &["3"]);
+    assert_prints(
+        "fun halt() { if (true) return; while (true) {} } print halt();",
+        &["nil"],
+    );
+    // early return
+    assert_prints(
+        r"
+             fun cond(c, t) {
+                 if (c) return t;
+    
+             }
+
+             print cond(true, 1);
+             print cond(false, 2);
+         ",
+        &["1", "nil"],
+    );
+    // recursion generally
+    assert_prints(
+        r"
+             fun pow(m, n) {
+                 if (n == 0) return 1;
+                 return m * pow(m, n - 1);
+             }
+
+             for (var i = 0; i < 10; i = i + 1) {
+                 print pow(2, i);
+             }
+         ",
+        &["1", "2", "4", "8", "16", "32", "64", "128", "256", "512"],
+    );
+    // pop env in case of early return
+    assert_prints(
+        r"
+            var a = 0;
+            fun f(a) {
+                if (true) return 1;
+            }
+
+            print f(3);
+            print a;
+        ",
+        &["1", "0"],
+    );
+    assert_prints(
+        r"
+            fun fib(n) {
+                if (n <= 1) return n;
+                return fib(n - 2) + fib(n - 1);
+            }
+
+            for (var i = 0; i < 20; i = i + 1) {
+                print fib(i);
+            }
+        ",
+        &[
+            "0", "1", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144", "233", "377",
+            "610", "987", "1597", "2584", "4181",
+        ],
+    );
+
+    assert_errs(
+        "return 3;",
+        "[line 1] Error: Can't return from top-level code.",
+    );
+    assert_errs(
+        "if (true) return 3;",
+        "[line 1] Error: Can't return from top-level code.",
     );
 }
