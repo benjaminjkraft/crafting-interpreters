@@ -43,7 +43,7 @@ impl<'a> fmt::Display for Object<'a> {
             Object::String(v) => write!(f, "{}", v),
             Object::Nil => write!(f, "nil"),
             Object::BuiltinFunction(v) => v.fmt(f),
-            Object::Function(stmt) => write!(f, "{}", stmt.name.lexeme),
+            Object::Function(stmt) => write!(f, "<function {}>", stmt.name.lexeme),
         }
     }
 }

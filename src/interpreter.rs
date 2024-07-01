@@ -40,19 +40,9 @@ pub fn interpreter<'a>() -> Interpreter<'a, impl FnMut(String)> {
     }
 }
 
-pub fn evaluate_source<'a, F: FnMut(String)>(
-    interpreter: &mut Interpreter<'a, F>,
-    source: &'a str,
-) -> Result<(), LoxError> {
-    let tokens = scanner::scan_tokens(source)?;
-    let prog = parser::parse(tokens)?;
-    interpreter.execute_program(&prog)?;
-    Ok(())
-}
-
 impl<'a, F: FnMut(String)> Interpreter<'a, F> {
-    fn execute_program(&mut self, node: &Program<'a>) -> Result<(), LoxError> {
-        self.execute_stmts(&node.stmts)
+    pub fn execute_program(&mut self, node: &'a Program<'a>) -> Result<(), LoxError> {
+        self.execute_stmts(&node.stmts, self.environment.clone())
     }
 
     fn evaluate(&mut self, node: &Expr<'a>) -> Result<Object<'a>, LoxError> {
@@ -130,7 +120,28 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
                             (f.function.borrow_mut())(arguments)
                         }
                     }
-                    Object::Function(f) => todo!(),
+                    Object::Function(f) => {
+                        let environment = self.child_environment();
+                        if f.parameters.len() != arguments.len() {
+                            // TODO: duplicated a bit
+                            runtime_error(
+                                &node.paren,
+                                &format!(
+                                    "Expected {} arguments but got {}.",
+                                    f.parameters.len(),
+                                    arguments.len()
+                                ),
+                            )
+                        } else {
+                            for (i, parameter) in f.parameters.iter().enumerate() {
+                                environment
+                                    .borrow_mut()
+                                    .define(parameter.lexeme, arguments[i].clone());
+                            }
+                            self.execute_stmts(&f.body, environment)?;
+                            Ok(Object::Nil) // TODO: return
+                        }
+                    }
                     o => runtime_error(
                         &node.paren,
                         &format!("Can only call functions and classes, got '{}'.", o),
@@ -163,27 +174,41 @@ impl<'a, F: FnMut(String)> Interpreter<'a, F> {
         }
     }
 
-    fn execute_stmts(&mut self, stmts: &Vec<Stmt<'a>>) -> Result<(), LoxError> {
+    fn execute_stmts(
+        &mut self,
+        stmts: &'a Vec<Stmt<'a>>,
+        environment: Rc<RefCell<Environment<'a>>>,
+    ) -> Result<(), LoxError> {
+        let prev = self.environment.clone();
+        self.environment = environment;
         for stmt in stmts {
             self.execute(&stmt)?;
         }
+        self.environment = prev;
         Ok(())
     }
 
-    fn execute(&mut self, node: &Stmt<'a>) -> Result<(), LoxError> {
+    fn child_environment(&self) -> Rc<RefCell<Environment<'a>>> {
+        Rc::new(RefCell::new(Environment::child(self.environment.clone())))
+    }
+
+    fn execute(&mut self, node: &'a Stmt<'a>) -> Result<(), LoxError> {
         match node {
             Stmt::Block(node) => {
-                let prev = self.environment.clone();
-                self.environment = Rc::new(RefCell::new(Environment::child(prev.clone())));
-                self.execute_stmts(&node.stmts)?;
-                self.environment = prev;
+                let environment = self.child_environment();
+                self.execute_stmts(&node.stmts, environment)?;
             }
 
             Stmt::Expr(node) => {
                 self.evaluate(&node.expr)?;
             }
 
-            Stmt::Function(node) => todo!(),
+            Stmt::Function(node) => {
+                let function = Object::Function(&node);
+                self.environment
+                    .borrow_mut()
+                    .define(node.name.lexeme, function);
+            }
 
             Stmt::If(node) => {
                 let cond = self.evaluate(&node.condition)?;
@@ -239,12 +264,15 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
             name: "clock".to_string(),
         }),
     );
+    let tokens = scanner::scan_tokens(source)?;
+    let prog = parser::parse(tokens)?;
     let mut interpreter = Interpreter {
         printer: |s| printed.push(s),
         globals: globals.clone(),
         environment: globals.clone(),
     };
-    evaluate_source(&mut interpreter, source)?;
+    // TODO: no really this leak is bad, redo all the lifetimes
+    interpreter.execute_program(Box::leak(Box::new(prog)))?;
     Ok(printed)
 }
 
@@ -411,5 +439,32 @@ fn test_call_builtin() {
     assert_prints(
         "print clock(); print clock(); print clock();",
         &["1", "2", "3"],
+    );
+    assert_prints("print clock;", &["<function clock>"]);
+    assert_errs(
+        "print clock(3);",
+        "[line 1] Error: Expected 0 arguments but got 1.",
+    );
+    assert_errs(
+        "var a = 1; print a(3);",
+        "[line 1] Error: Can only call functions and classes, got '1'.",
+    );
+}
+
+#[test]
+fn test_functions() {
+    assert_prints("fun add(a, b) { print a + b; } add(1, 2);", &["3"]);
+    assert_prints(
+        "fun count(n) { if (n > 1) count(n-1); print n; } count(3);",
+        &["1", "2", "3"],
+    );
+
+    assert_errs(
+        "fun f(n) {} print f(1, 2);",
+        "[line 1] Error: Expected 1 arguments but got 2.",
+    );
+    assert_errs(
+        "fun f(n) {} print f();",
+        "[line 1] Error: Expected 1 arguments but got 0.",
     );
 }

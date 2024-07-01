@@ -35,9 +35,10 @@ fn main() -> ExitCode {
 }
 
 fn run_file(path: &str) -> Result<(), LoxError> {
-    let contents = fs::read_to_string(path).unwrap();
+    let source = fs::read_to_string(path).unwrap();
     let mut interpreter = interpreter::interpreter();
-    interpreter::evaluate_source(&mut interpreter, &contents)
+    // TODO: this doesn't feel like it should need to leak?
+    execute_and_leak_source(&mut interpreter, source)
 }
 
 fn read_line() -> Option<String> {
@@ -51,6 +52,15 @@ fn read_line() -> Option<String> {
     }
 }
 
+fn execute_and_leak_source<'a, F: FnMut(String)>(
+    interpreter: &mut interpreter::Interpreter<'a, F>,
+    source: String,
+) -> Result<(), LoxError> {
+    let tokens = scanner::scan_tokens(String::leak(source))?;
+    let prog = parser::parse(tokens)?;
+    interpreter.execute_program(Box::leak(Box::new(prog)))
+}
+
 fn run_prompt() {
     let mut interpreter = interpreter::interpreter();
 
@@ -59,7 +69,7 @@ fn run_prompt() {
             None => return,
             Some(s) => s,
         };
-        let result = interpreter::evaluate_source(&mut interpreter, String::leak(source));
+        let result = execute_and_leak_source(&mut interpreter, source);
         match result {
             Ok(()) => (),
             Err(err) => println!("{}", err),
