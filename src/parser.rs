@@ -13,33 +13,39 @@ use itertools::Itertools;
 struct Parser<'src> {
     tokens: Vec<Token<'src>>,
     current: usize,
+    errors: Vec<LoxError>,
 }
 
 pub fn parse<'src>(tokens: Vec<Token<'src>>) -> Result<Program<'src>, Vec<LoxError>> {
-    (Parser { tokens, current: 0 }).program()
+    let mut parser = Parser {
+        tokens,
+        current: 0,
+        errors: Vec::new(),
+    };
+    let result = parser.program();
+    if parser.errors.len() > 0 {
+        Err(parser.errors)
+    } else {
+        Ok(result)
+    }
 }
 
 impl<'src> Parser<'src> {
-    fn program(&mut self) -> Result<Program<'src>, Vec<LoxError>> {
+    fn program(&mut self) -> Program<'src> {
         let mut declarations = Vec::new();
-        let mut errors = Vec::new();
         while !self.is_at_end() {
             let declaration = self.declaration();
             match declaration {
                 Ok(decl) => declarations.push(decl),
                 Err(err) => {
-                    errors.push(err);
+                    self.errors.push(err);
                     self.synchronize();
                 }
             }
         }
 
-        if errors.len() > 0 {
-            Err(errors)
-        } else {
-            Ok(Program {
-                stmts: declarations,
-            })
+        Program {
+            stmts: declarations,
         }
     }
 
@@ -231,8 +237,7 @@ impl<'src> Parser<'src> {
         if !self.check(TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
-                    // TODO: not supposed to return here, in theory.
-                    return Err(error::parse_error(
+                    self.errors.push(error::parse_error(
                         self.peek(),
                         "Can't have more than 255 parameters.",
                     ));
@@ -397,8 +402,7 @@ impl<'src> Parser<'src> {
         if !self.check(TokenType::RightParen) {
             loop {
                 if arguments.len() >= 255 {
-                    // TODO: not supposed to return here, in theory.
-                    return Err(error::parse_error(
+                    self.errors.push(error::parse_error(
                         self.peek(),
                         "Can't have more than 255 arguments.",
                     ));
