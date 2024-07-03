@@ -35,6 +35,7 @@ pub enum Stmt<'src> {
 pub struct AssignExpr<'src> {
     pub name: scanner::Token<'src>,
     pub value: Box<Expr<'src>>,
+    pub resolved_depth: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -77,6 +78,7 @@ pub struct UnaryExpr<'src> {
 #[derive(Debug)]
 pub struct VariableExpr<'src> {
     pub name: scanner::Token<'src>,
+    pub resolved_depth: Option<usize>,
 }
 
 #[derive(Debug)]

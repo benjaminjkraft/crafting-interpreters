@@ -8,7 +8,7 @@ use itertools::Itertools;
 use std::fmt;
 
 #[cfg(test)]
-pub fn print<'src>(node: Program<'src>) -> String {
+pub fn print<'src>(node: &Program<'src>) -> String {
     node.stmts.iter().map(|stmt| print_stmt(stmt)).join("\n")
 }
 
@@ -105,5 +105,5 @@ fn print_stmt<'src>(node: &Stmt<'src>) -> String {
 
 #[test]
 fn test_printer() {
-    insta::assert_debug_snapshot!(print(parser::must_parse("-123*(45.67);")));
+    insta::assert_debug_snapshot!(print(&parser::must_parse("-123*(45.67);")));
 }

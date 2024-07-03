@@ -22,17 +22,21 @@ impl fmt::Display for LoxError {
 
 impl From<Vec<LoxError>> for LoxError {
     fn from(value: Vec<LoxError>) -> Self {
-        let mut first = value[0].clone();
-        first.message = format!(
-            "{}\n{}",
-            first.message,
-            value[1..].iter().map(|err| format!("{}", err)).join("\n")
-        );
-        first
+        if value.len() <= 1 {
+            value[0].clone()
+        } else {
+            let mut first = value[0].clone();
+            first.message = format!(
+                "{}\n{}",
+                first.message,
+                value[1..].iter().map(|err| format!("{}", err)).join("\n")
+            );
+            first
+        }
     }
 }
 
-pub fn parse_error(token: scanner::Token, message: &str) -> LoxError {
+pub fn parse_error(token: &scanner::Token, message: &str) -> LoxError {
     let loc = if token.type_ == scanner::TokenType::EOF {
         " at end".to_string()
     } else {

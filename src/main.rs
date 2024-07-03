@@ -11,6 +11,7 @@ mod error;
 mod interpreter;
 mod object;
 mod parser;
+mod resolver;
 mod scanner;
 mod unwind;
 
@@ -38,7 +39,8 @@ fn main() -> ExitCode {
 fn run_file(path: &str) -> Result<(), LoxError> {
     let source = fs::read_to_string(path).unwrap();
     let tokens = scanner::scan_tokens(&source)?;
-    let prog = parser::parse(tokens)?;
+    let mut prog = parser::parse(tokens)?;
+    resolver::resolve(&mut prog)?;
     let mut interpreter = interpreter::interpreter();
     interpreter.execute_program(&prog)
 }
@@ -63,7 +65,8 @@ fn execute_and_leak_source<'ast, 'src: 'ast, F: FnMut(String)>(
     source: String,
 ) -> Result<(), LoxError> {
     let tokens = scanner::scan_tokens(String::leak(source))?;
-    let prog = parser::parse(tokens)?;
+    let mut prog = parser::parse(tokens)?;
+    resolver::resolve(&mut prog)?;
     interpreter.execute_program(Box::leak(Box::new(prog)))
 }
 

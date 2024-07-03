@@ -238,7 +238,7 @@ impl<'src> Parser<'src> {
             loop {
                 if parameters.len() >= 255 {
                     self.errors.push(error::parse_error(
-                        self.peek(),
+                        &self.peek(),
                         "Can't have more than 255 parameters.",
                     ));
                 }
@@ -294,7 +294,7 @@ impl<'src> Parser<'src> {
             let var = match expr {
                 Expr::Variable(v) => Ok(v),
                 _ => Err(error::parse_error(
-                    self.previous(),
+                    &self.previous(),
                     "Invalid assignment target.",
                 )),
             }?;
@@ -302,6 +302,7 @@ impl<'src> Parser<'src> {
             Ok(AssignExpr {
                 name: var.name,
                 value: Box::new(value),
+                resolved_depth: None,
             }
             .into())
         } else {
@@ -403,7 +404,7 @@ impl<'src> Parser<'src> {
             loop {
                 if arguments.len() >= 255 {
                     self.errors.push(error::parse_error(
-                        self.peek(),
+                        &self.peek(),
                         "Can't have more than 255 arguments.",
                     ));
                 }
@@ -455,6 +456,7 @@ impl<'src> Parser<'src> {
         } else if self.match_(&[TokenType::Identifier]) {
             Ok(VariableExpr {
                 name: self.previous(),
+                resolved_depth: None,
             }
             .into())
         } else if self.match_(&[TokenType::LeftParen]) {
@@ -465,7 +467,7 @@ impl<'src> Parser<'src> {
             }
             .into())
         } else {
-            Err(error::parse_error(self.peek(), "Expect expression."))
+            Err(error::parse_error(&self.peek(), "Expect expression."))
         }
     }
 
@@ -484,7 +486,7 @@ impl<'src> Parser<'src> {
         if self.check(type_) {
             Ok(self.advance())
         } else {
-            Err(error::parse_error(self.peek(), message))
+            Err(error::parse_error(&self.peek(), message))
         }
     }
 
@@ -543,7 +545,7 @@ pub fn must_parse<'src>(input: &'src str) -> Program<'src> {
 
 #[cfg(test)]
 fn assert_parses_to(input: &str, printed: &str) {
-    assert_eq!(ast_printer::print(must_parse(input)), printed);
+    assert_eq!(ast_printer::print(&must_parse(input)), printed);
 }
 
 #[cfg(test)]

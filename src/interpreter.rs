@@ -5,6 +5,8 @@ use crate::object::{Function, Literal, Object};
 #[cfg(test)]
 use crate::parser;
 #[cfg(test)]
+use crate::resolver;
+#[cfg(test)]
 use crate::scanner;
 use crate::scanner::TokenType;
 use crate::unwind::Unwinder;
@@ -49,9 +51,10 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         match result {
             Ok(()) => Ok(()),
             Err(Unwinder::Err(e)) => Err(e),
-            Err(Unwinder::Return { keyword, value: _ }) => {
-                Err(runtime_error(&keyword, "Can't return from top-level code."))
-            }
+            Err(Unwinder::Return { keyword, value: _ }) => Err(runtime_error(
+                keyword,
+                "[resolver bug] Can't return from top-level code.",
+            )),
         }
     }
 
@@ -59,9 +62,17 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         match node {
             Expr::Assign(node) => {
                 let value = self.evaluate(&node.value)?;
-                self.environment
-                    .borrow_mut()
-                    .assign(&node.name, value.clone())?;
+                match node.resolved_depth {
+                    Some(depth) => {
+                        self.environment
+                            .borrow_mut()
+                            .assign_at(depth, &node.name, value.clone())?
+                    }
+                    None => self
+                        .globals
+                        .borrow_mut()
+                        .assign(&node.name, value.clone())?,
+                }
                 Ok(value)
             }
             Expr::Binary(node) => {
@@ -218,7 +229,10 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
-            Expr::Variable(node) => self.environment.borrow().get(&node.name),
+            Expr::Variable(node) => match node.resolved_depth {
+                Some(depth) => self.environment.borrow().get_at(depth, &node.name),
+                None => self.globals.borrow().get(&node.name),
+            },
         }
     }
 
@@ -311,7 +325,8 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
     let mut printed: Vec<String> = Vec::new();
     let mut time = 0.0;
     let tokens = scanner::scan_tokens(source)?;
-    let prog = parser::parse(tokens)?;
+    let mut prog = parser::parse(tokens)?;
+    resolver::resolve(&mut prog)?;
     {
         let globals = Rc::new(RefCell::new(Environment::new()));
         globals.borrow_mut().define(
@@ -404,9 +419,9 @@ fn test_evaluate_blocks() {
         "[line 1] Error: Undefined variable 'b'.",
     );
     assert_prints("var a = 1; { a = 2; } print a;", &["2"]);
-    assert_prints(
+    assert_errs(
         "var a = 1; { var a = a + 2; print a; } print a;",
-        &["3", "1"],
+        "[line 1] Error at 'a': Can't read local variable in its own initializer.",
     );
     assert_prints(
         r#"
@@ -604,11 +619,11 @@ fn test_returns() {
 
     assert_errs(
         "return 3;",
-        "[line 1] Error: Can't return from top-level code.",
+        "[line 1] Error at 'return': Can't return from top-level code.",
     );
     assert_errs(
         "if (true) return 3;",
-        "[line 1] Error: Can't return from top-level code.",
+        "[line 1] Error at 'return': Can't return from top-level code.",
     );
 }
 
@@ -633,5 +648,38 @@ fn test_closures() {
             print counter2();
         ",
         &["1", "2", "1", "2"],
+    );
+}
+
+#[test]
+fn test_scoping() {
+    assert_prints(
+        r#"
+            var a = "global";
+            {
+                fun showA() {
+                    print a;
+                }
+
+                showA();
+                var a = "block";
+                showA();
+            }
+        "#,
+        &["global", "global"],
+    );
+    assert_prints("var a = 1; var a = 2; print a;", &["2"]);
+    assert_errs(
+        "var a = 1; { var a = a; }",
+        "[line 1] Error at 'a': Can't read local variable in its own initializer.",
+    );
+    assert_errs(
+        "{ var a = 1;\nvar a = a; }",
+        &("[line 2] Error at 'a': Already a variable with this name in this scope.\n".to_string()
+            + "[line 2] Error at 'a': Can't read local variable in its own initializer."),
+    );
+    assert_errs(
+        "{ var a = 1;\nvar a = 2; }",
+        "[line 2] Error at 'a': Already a variable with this name in this scope.",
     );
 }
