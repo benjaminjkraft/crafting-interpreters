@@ -18,9 +18,9 @@ pub enum Literal {
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Number(v) => write!(f, "{}", v),
-            Literal::Bool(v) => write!(f, "{}", v),
-            Literal::String(v) => write!(f, "{}", v),
+            Literal::Number(v) => write!(f, "{v}"),
+            Literal::Bool(v) => write!(f, "{v}"),
+            Literal::String(v) => write!(f, "{v}"),
             Literal::Nil => write!(f, "nil"),
         }
     }
@@ -69,7 +69,7 @@ impl fmt::Display for Function<'_, '_> {
 impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Object::Literal(v) => write!(f, "{}", v),
+            Object::Literal(v) => write!(f, "{v}"),
             Object::BuiltinFunction(v) => v.fmt(f),
             Object::Function {
                 declaration,
@@ -90,6 +90,7 @@ impl<'ast, 'src: 'ast> Object<'ast, 'src> {
 
 impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
     fn eq(&self, other: &Self) -> bool {
+        #[allow(clippy::match_same_arms)]
         match (self, other) {
             (Object::Literal(l), Object::Literal(r)) => l == r,
             (Object::Literal(_), _) | (_, Object::Literal(_)) => false,

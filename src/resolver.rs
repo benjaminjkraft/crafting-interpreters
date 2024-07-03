@@ -39,7 +39,7 @@ impl<'src> Resolver<'src> {
     }
 
     fn resolve_stmts(&mut self, stmts: &mut [Stmt<'src>]) {
-        for stmt in stmts.iter_mut() {
+        for stmt in stmts {
             self.resolve_stmt(stmt);
         }
     }
@@ -56,7 +56,7 @@ impl<'src> Resolver<'src> {
                 self.declare(&node.name);
                 self.define(&node.name);
 
-                self.resolve_function(&node.parameters, &mut node.body, FunctionType::Function)
+                self.resolve_function(&node.parameters, &mut node.body, FunctionType::Function);
             }
             Stmt::Return(node) => {
                 if self.current_function == FunctionType::None {
@@ -66,13 +66,13 @@ impl<'src> Resolver<'src> {
                     ));
                 }
                 if let Some(ref mut value) = &mut node.value {
-                    self.resolve_expr(value)
+                    self.resolve_expr(value);
                 }
             }
             Stmt::Var(node) => {
                 self.declare(&node.name);
                 if let Some(ref mut init) = &mut node.initializer {
-                    self.resolve_expr(init)
+                    self.resolve_expr(init);
                 }
                 self.define(&node.name);
             }
@@ -85,7 +85,7 @@ impl<'src> Resolver<'src> {
                 self.resolve_expr(&mut node.condition);
                 self.resolve_stmt(&mut node.then_);
                 if let Some(ref mut else_) = &mut node.else_ {
-                    self.resolve_stmt(else_)
+                    self.resolve_stmt(else_);
                 }
             }
             Stmt::Print(node) => {
@@ -145,7 +145,7 @@ impl<'src> Resolver<'src> {
             }
             Expr::Call(node) => {
                 self.resolve_expr(&mut node.callee);
-                for argument in node.arguments.iter_mut() {
+                for argument in &mut node.arguments {
                     self.resolve_expr(argument);
                 }
             }

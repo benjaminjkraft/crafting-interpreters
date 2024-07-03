@@ -10,7 +10,16 @@ itertools = "0.13.0"
 once_cell = "1.19.0"
 
 [lints.clippy]
-needless_lifetimes = "allow"
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow" # TODO
+enum_glob_use = "allow"
+if_not_else = "allow"
 len_zero = "allow"
-type_complexity = "allow"
 manual_range_contains = "allow"
+match_wildcard_for_single_variants = "allow"
+needless_lifetimes = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"
+type_complexity = "allow"
+unnecessary_wraps = "allow"
+wildcard_imports = "allow"

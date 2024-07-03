@@ -227,10 +227,10 @@ impl<'src> Parser<'src> {
     }
 
     fn function(&mut self, kind: &str) -> Result<Stmt<'src>, LoxError> {
-        let name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?;
+        let name = self.consume(TokenType::Identifier, &format!("Expect {kind} name."))?;
         self.consume(
             TokenType::LeftParen,
-            &format!("Expect '(' after {} name.", kind),
+            &format!("Expect '(' after {kind} name."),
         )?;
         let mut parameters = Vec::new();
         // TODO: abstract into some kind of parse-list-while loop?
@@ -253,7 +253,7 @@ impl<'src> Parser<'src> {
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.consume(
             TokenType::LeftBrace,
-            &format!("Expect '{{' before {} body.", kind),
+            &format!("Expect '{{' before {kind} body."),
         )?;
         let body = self.block()?;
         Ok(FunctionStmt {
@@ -343,7 +343,7 @@ impl<'src> Parser<'src> {
     fn equality(&mut self) -> Result<Expr<'src>, LoxError> {
         self.binary_expression(
             &[TokenType::BangEqual, TokenType::EqualEqual],
-            &mut |self_| self_.comparison(),
+            &mut Parser::comparison,
         )
     }
 
@@ -355,7 +355,7 @@ impl<'src> Parser<'src> {
                 TokenType::Less,
                 TokenType::LessEqual,
             ],
-            &mut |self_| self_.term(),
+            &mut Parser::term,
         )
     }
 
@@ -520,7 +520,7 @@ impl<'src> Parser<'src> {
 
     fn advance(&mut self) -> Token<'src> {
         if !self.is_at_end() {
-            self.current += 1
+            self.current += 1;
         }
         self.previous()
     }

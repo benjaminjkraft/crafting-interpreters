@@ -70,8 +70,7 @@ impl<'src> Scanner<'src> {
                     self.token(Slash)
                 }
             }
-            b' ' | b'\r' | b'\t' => None,
-            b'\n' => None,
+            b' ' | b'\r' | b'\t' | b'\n' => None,
             b'"' => self.string()?,
             c => {
                 if is_digit(c) {
@@ -79,7 +78,7 @@ impl<'src> Scanner<'src> {
                 } else if is_alpha(c) {
                     self.identifier()
                 } else {
-                    self.err(format!("Unexpected character: '{}'.", c))?
+                    self.err(format!("Unexpected character: '{c}'."))?
                 }
             }
         })

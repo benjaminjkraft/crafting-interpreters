@@ -47,14 +47,11 @@ fn print_expr<'src>(node: &Expr<'src>) -> String {
 
 #[cfg(test)]
 fn print_block<'src>(head: &str, stmts: &Vec<Stmt<'src>>) -> String {
-    format!(
-        "({}\n{})",
-        head,
-        stmts
-            .iter()
-            .map(|stmt| format!("\t{}\n", print_stmt(stmt)))
-            .join("")
-    )
+    let body = stmts
+        .iter()
+        .map(|stmt| format!("\t{}\n", print_stmt(stmt)))
+        .join("");
+    format!("({head}\n{body})")
 }
 
 #[cfg(test)]

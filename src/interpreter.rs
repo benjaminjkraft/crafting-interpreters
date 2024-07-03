@@ -24,7 +24,7 @@ pub struct Interpreter<'ast, 'src: 'ast, F: FnMut(String)> {
 fn now_sec<'ast, 'src: 'ast>() -> Result<Object<'ast, 'src>, LoxError> {
     match time::SystemTime::now().duration_since(time::UNIX_EPOCH) {
         Ok(t) => Ok(Object::Literal(Literal::Number(t.as_secs_f64()))),
-        Err(e) => panic!("{}", e),
+        Err(e) => panic!("{e}"),
     }
 }
 
@@ -39,7 +39,7 @@ pub fn interpreter<'ast, 'src: 'ast>() -> Interpreter<'ast, 'src, impl FnMut(Str
         }),
     );
     Interpreter {
-        printer: |s| println!("{}", s),
+        printer: |s| println!("{s}"),
         globals: globals.clone(),
         environment: globals.clone(),
     }
@@ -64,10 +64,13 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 let value = self.evaluate(&node.value)?;
                 match node.resolved_depth {
                     Some(depth) => {
-                        self.environment
-                            .borrow_mut()
-                            .assign_at(depth, &node.name, value.clone())?
+                        self.environment.borrow_mut().assign_at(
+                            depth,
+                            &node.name,
+                            value.clone(),
+                        )?;
                     }
+
                     None => self
                         .globals
                         .borrow_mut()
@@ -201,7 +204,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     }
                     o => Unwinder::err(
                         &node.paren,
-                        &format!("Can only call functions and classes, got '{}'.", o),
+                        &format!("Can only call functions and classes, got '{o}'."),
                     ),
                 }
             }
@@ -285,7 +288,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
             Stmt::Print(node) => {
                 let value = self.evaluate(&node.expr)?;
-                let stringified = format!("{}", value);
+                let stringified = format!("{value}");
                 (self.printer)(stringified);
             }
             Stmt::Return(node) => {
@@ -296,7 +299,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 Err(Unwinder::Return {
                     keyword: &node.keyword,
                     value,
-                })?
+                })?;
             }
             Stmt::Var(node) => {
                 let value = match &node.initializer {
@@ -357,14 +360,14 @@ fn assert_prints(source: &str, expected: &[&str]) {
             a,
             expected.iter().map(|s| s.to_string()).collect::<Vec<_>>()
         ),
-        Err(a) => assert!(false, "Expected {:?}, got error {}", expected, a),
+        Err(a) => assert!(false, "Expected {expected:?}, got error {a}"),
     }
 }
 
 #[cfg(test)]
 fn assert_errs(source: &str, expected: &str) {
     match execute_for_tests(source) {
-        Ok(a) => assert!(false, "Expected error {}, got {:?}", expected, a),
+        Ok(a) => assert!(false, "Expected error {expected}, got {a:?}"),
         Err(a) => assert_eq!(a.to_string(), expected),
     }
 }

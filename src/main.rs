@@ -27,7 +27,7 @@ fn main() -> ExitCode {
             match result {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(err) => {
-                    println!("{}", err);
+                    println!("{err}");
                     ExitCode::from(err.exit)
                 }
             }
@@ -81,7 +81,7 @@ fn run_prompt() {
         let result = execute_and_leak_source(&mut interpreter, source);
         match result {
             Ok(()) => (),
-            Err(err) => println!("{}", err),
+            Err(err) => println!("{err}"),
         };
     }
 }
