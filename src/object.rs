@@ -45,9 +45,8 @@ pub enum Object<'ast, 'src: 'ast> {
         declaration: &'ast ast::FunctionStmt<'src>,
         closure: Rc<RefCell<Environment<'ast, 'src>>>,
     },
-    Class {
-        name: &'ast scanner::Token<'src>,
-    },
+    Class(Rc<RefCell<Class<'ast, 'src>>>),
+    Instance(Rc<RefCell<Instance<'ast, 'src>>>),
 }
 
 #[derive(Clone)]
@@ -70,16 +69,38 @@ impl fmt::Display for Function<'_, '_> {
     }
 }
 
+#[derive(Debug)]
+pub struct Class<'ast, 'src> {
+    pub name: &'ast scanner::Token<'src>,
+}
+
+impl fmt::Display for Class<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<class {}>", &self.name.lexeme)
+    }
+}
+
+#[derive(Debug)]
+pub struct Instance<'ast, 'src> {
+    pub class_: Rc<RefCell<Class<'ast, 'src>>>,
+}
+
+impl fmt::Display for Instance<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<instance of {}>", &self.class_.borrow().name.lexeme)
+    }
+}
+
 impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Object::Literal(v) => write!(f, "{v}"),
             Object::BuiltinFunction(v) => v.fmt(f),
-            Object::Function {
-                declaration,
-                closure: _,
-            } => write!(f, "<function {}>", declaration.name.lexeme),
-            Object::Class { name } => write!(f, "<class {}>", name.lexeme),
+            Object::Function { declaration, .. } => {
+                write!(f, "<function {}>", declaration.name.lexeme)
+            }
+            Object::Class(c) => c.borrow().fmt(f),
+            Object::Instance(i) => i.borrow().fmt(f),
         }
     }
 }
@@ -107,8 +128,10 @@ impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
                 ptr::eq(*l, *r)
             }
             (Object::Function { .. }, _) | (_, Object::Function { .. }) => false,
-            (Object::Class { name: l }, Object::Class { name: r }) => ptr::eq(*l, *r),
-            // (Object::Class { .. }, _) | (_, Object::Class { .. }) => false,
+            (Object::Class(l), Object::Class(r)) => Rc::ptr_eq(l, r),
+            (Object::Class(_), _) | (_, Object::Class(_)) => false,
+            (Object::Instance(l), Object::Instance(r)) => Rc::ptr_eq(l, r),
+            // (Object::Instance(l), _) | (_, Object::Instance(r)) => false,
         }
     }
 }

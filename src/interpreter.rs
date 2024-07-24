@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
-use crate::object::{Function, Literal, Object};
+use crate::object::{Class, Function, Instance, Literal, Object};
 #[cfg(test)]
 use crate::parser;
 #[cfg(test)]
@@ -202,6 +202,19 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             r
                         }
                     }
+                    Object::Class(c) => {
+                        if arguments.len() != 0 {
+                            // TODO: duplicated a bit
+                            Unwinder::err(
+                                &node.paren,
+                                &format!("Expected 0 arguments but got {}.", arguments.len()),
+                            )
+                        } else {
+                            Ok(Object::Instance(Rc::new(RefCell::new(Instance {
+                                class_: c,
+                            }))))
+                        }
+                    }
                     o => Unwinder::err(
                         &node.paren,
                         &format!("Can only call functions and classes, got '{o}'."),
@@ -265,7 +278,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Class(node) => {
-                let class_ = Object::Class { name: &node.name };
+                let class_ = Object::Class(Rc::new(RefCell::new(Class { name: &node.name })));
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, class_);
@@ -706,4 +719,11 @@ fn test_class() {
     assert_prints("class C {} print C;", &["<class C>"]);
     assert_prints("class C {} print C == C;", &["true"]);
     assert_prints("class C {} var a = C; class C {} print a == C;", &["false"]);
+
+    assert_prints("class C {} var i = C(); print i;", &["<instance of C>"]);
+    assert_prints("class C {} var i = C(); print i == i;", &["true"]);
+    assert_prints(
+        "class C {} var i = C(); var j = C(); print i == j;",
+        &["false"],
+    );
 }
