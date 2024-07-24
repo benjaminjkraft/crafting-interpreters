@@ -1,6 +1,7 @@
 use crate::ast;
 use crate::environment::Environment;
 use crate::error::LoxError;
+use crate::scanner;
 use std::cell::RefCell;
 use std::fmt;
 use std::ptr;
@@ -44,6 +45,9 @@ pub enum Object<'ast, 'src: 'ast> {
         declaration: &'ast ast::FunctionStmt<'src>,
         closure: Rc<RefCell<Environment<'ast, 'src>>>,
     },
+    Class {
+        name: &'ast scanner::Token<'src>,
+    },
 }
 
 #[derive(Clone)]
@@ -75,6 +79,7 @@ impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
                 declaration,
                 closure: _,
             } => write!(f, "<function {}>", declaration.name.lexeme),
+            Object::Class { name } => write!(f, "<class {}>", name.lexeme),
         }
     }
 }
@@ -98,17 +103,12 @@ impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
                 l.arity == r.arity && Rc::ptr_eq(&l.function, &r.function) && l.name == r.name
             }
             (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
-            (
-                Object::Function {
-                    declaration: l,
-                    closure: _,
-                },
-                Object::Function {
-                    declaration: r,
-                    closure: _,
-                },
-            ) => ptr::eq(l, r),
-            // (Object::Function(_), _) | (_, Object::Function(_)) => false,
+            (Object::Function { declaration: l, .. }, Object::Function { declaration: r, .. }) => {
+                ptr::eq(*l, *r)
+            }
+            (Object::Function { .. }, _) | (_, Object::Function { .. }) => false,
+            (Object::Class { name: l }, Object::Class { name: r }) => ptr::eq(*l, *r),
+            // (Object::Class { .. }, _) | (_, Object::Class { .. }) => false,
         }
     }
 }

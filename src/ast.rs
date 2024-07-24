@@ -22,6 +22,7 @@ pub enum Expr<'src> {
 #[derive(Debug, From)]
 pub enum Stmt<'src> {
     Block(BlockStmt<'src>),
+    Class(ClassStmt<'src>),
     Expr(ExprStmt<'src>),
     Function(FunctionStmt<'src>),
     If(IfStmt<'src>),
@@ -84,6 +85,12 @@ pub struct VariableExpr<'src> {
 #[derive(Debug)]
 pub struct BlockStmt<'src> {
     pub stmts: Vec<Stmt<'src>>,
+}
+
+#[derive(Debug)]
+pub struct ClassStmt<'src> {
+    pub name: scanner::Token<'src>,
+    pub methods: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug)]

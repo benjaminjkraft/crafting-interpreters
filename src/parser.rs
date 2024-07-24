@@ -52,11 +52,24 @@ impl<'src> Parser<'src> {
     fn declaration(&mut self) -> Result<Stmt<'src>, LoxError> {
         if self.match_(&[TokenType::Var]) {
             self.var_declaration()
+        } else if self.match_(&[TokenType::Class]) {
+            self.class_declaration()
         } else if self.match_(&[TokenType::Fun]) {
             self.function("function")
         } else {
             self.statement()
         }
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt<'src>, LoxError> {
+        let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+        self.consume(TokenType::LeftBrace, "Expect '{' before class body.")?;
+        let mut methods = Vec::new();
+        while !self.is_at_end() && !self.check(TokenType::RightBrace) {
+            methods.push(self.function("method")?);
+        }
+        self.consume(TokenType::RightBrace, "Expect '}' after class body.")?;
+        Ok(ClassStmt { name, methods }.into())
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'src>, LoxError> {
@@ -744,4 +757,31 @@ fn test_parser_function() {
 fn test_parser_return() {
     assert_parses_to("fun f() { return 3; }", "(fun f (\n\t(return (3))\n))");
     assert_parses_to("fun f() { return; }", "(fun f (\n\t(return)\n))");
+}
+
+#[test]
+fn test_parser_class() {
+    assert_parses_to("class C {}", "(class C\n)");
+    assert_parses_to(
+        "class C { f() { return 3; } }",
+        "(class C\n\t(fun f (\n\t(return (3))\n))\n)",
+    );
+    assert_parses_to(
+        "class C { f() { return 3; } g() { return 4; } }",
+        "(class C\n\t(fun f (\n\t(return (3))\n))\n\t(fun g (\n\t(return (4))\n))\n)",
+    );
+
+    assert_parse_error("class", &["[line 1] Error at end: Expect class name."]);
+    assert_parse_error(
+        "class C",
+        &["[line 1] Error at end: Expect '{' before class body."],
+    );
+    assert_parse_error(
+        "class C {",
+        &["[line 1] Error at end: Expect '}' after class body."],
+    );
+    assert_parse_error(
+        "class C { + }",
+        &["[line 1] Error at '+': Expect method name."],
+    );
 }

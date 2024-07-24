@@ -52,6 +52,10 @@ impl<'src> Resolver<'src> {
                 self.resolve_stmts(&mut node.stmts);
                 self.end_scope();
             }
+            Stmt::Class(node) => {
+                self.declare(&node.name);
+                self.define(&node.name);
+            }
             Stmt::Function(node) => {
                 self.declare(&node.name);
                 self.define(&node.name);

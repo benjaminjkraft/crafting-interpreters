@@ -264,6 +264,13 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 self.execute_stmts(&node.stmts, environment)?;
             }
 
+            Stmt::Class(node) => {
+                let class_ = Object::Class { name: &node.name };
+                self.environment
+                    .borrow_mut()
+                    .define(node.name.lexeme, class_);
+            }
+
             Stmt::Expr(node) => {
                 self.evaluate(&node.expr)?;
             }
@@ -518,6 +525,7 @@ fn test_call_builtin() {
         &["1", "2", "3"],
     );
     assert_prints("print clock;", &["<function clock>"]);
+    assert_prints("print clock == clock;", &["true"]);
     assert_errs(
         "print clock(3);",
         "[line 1] Error: Expected 0 arguments but got 1.",
@@ -544,6 +552,12 @@ fn test_functions() {
             sayHi("Dear", "Reader");
         "#,
         &["Hi, Dear Reader!"],
+    );
+    assert_prints("fun f() {} print f == f;", &["true"]);
+    assert_prints("fun f() {} var g = f; fun f() {} print g == f;", &["false"]);
+    assert_prints(
+        "var a = clock; fun clock() {} print a == clock;",
+        &["false"],
     );
 
     assert_errs(
@@ -685,4 +699,11 @@ fn test_scoping() {
         "{ var a = 1;\nvar a = 2; }",
         "[line 2] Error at 'a': Already a variable with this name in this scope.",
     );
+}
+
+#[test]
+fn test_class() {
+    assert_prints("class C {} print C;", &["<class C>"]);
+    assert_prints("class C {} print C == C;", &["true"]);
+    assert_prints("class C {} var a = C; class C {} print a == C;", &["false"]);
 }

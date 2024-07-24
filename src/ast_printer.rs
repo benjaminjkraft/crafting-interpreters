@@ -58,6 +58,7 @@ fn print_block<'src>(head: &str, stmts: &Vec<Stmt<'src>>) -> String {
 fn print_stmt<'src>(node: &Stmt<'src>) -> String {
     match node {
         Stmt::Block(node) => print_block("block", &node.stmts),
+        Stmt::Class(node) => print_block(&format!("class {}", node.name.lexeme), &node.methods),
         Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
         Stmt::Function(node) => {
             let mut parts = vec!["fun", node.name.lexeme];
