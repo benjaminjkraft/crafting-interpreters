@@ -305,8 +305,18 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     .borrow_mut()
                     .define(node.name.lexeme, Object::Literal(Literal::Nil));
 
-                // let methods = HashMap::new();
-                let class_ = Object::Class(Rc::new(RefCell::new(Class { name: &node.name })));
+                let mut methods = HashMap::new();
+                for method in &node.methods {
+                    let function = Function {
+                        declaration: method,
+                        closure: self.environment.clone(),
+                    };
+                    methods.insert(method.name.lexeme.to_string(), function);
+                }
+                let class_ = Object::Class(Rc::new(RefCell::new(Class {
+                    name: &node.name,
+                    methods,
+                })));
 
                 self.environment.borrow_mut().assign(&node.name, class_)?;
             }
@@ -774,5 +784,31 @@ fn test_fields() {
     assert_errs(
         "class C {} var i = C(); print i.f;",
         "[line 1] Error: Undefined property 'f'.",
+    );
+}
+
+#[test]
+fn test_methods() {
+    assert_prints(
+        r#"
+            fun f() { print "free function"; return "free"; }
+            class C {
+                f() { print "in f"; return "ret"; }
+            }
+            var i = C();
+            print i.f();
+            i.f = f;
+            print i.f();
+        "#,
+        &["in f", "ret", "free function", "free"],
+    );
+    assert_errs(
+        r#"
+            fun f() { print "free function"; return "free"; }
+            class C {}
+            var i = C();
+            print i.f();
+        "#,
+        "[line 5] Error: Undefined property 'f'.",
     );
 }

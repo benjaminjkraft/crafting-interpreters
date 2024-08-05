@@ -3,6 +3,7 @@ use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::scanner;
 use crate::unwind::Unwinder;
+use derive_more::From;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -39,7 +40,7 @@ impl Literal {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From)]
 pub enum Object<'ast, 'src: 'ast> {
     Literal(Literal),
     BuiltinFunction(BuiltinFunction<'ast, 'src>),
@@ -89,6 +90,17 @@ impl fmt::Display for Function<'_, '_> {
 #[derive(Debug)]
 pub struct Class<'ast, 'src> {
     pub name: &'ast scanner::Token<'src>,
+    pub methods: HashMap<String, Function<'ast, 'src>>,
+}
+
+impl<'ast, 'src> Class<'ast, 'src> {
+    fn find_method(&self, name: &str) -> Option<Function<'ast, 'src>> {
+        if let Some(method) = self.methods.get(name) {
+            Some(method.clone())
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Class<'_, '_> {
@@ -108,9 +120,12 @@ impl<'ast, 'src> Instance<'ast, 'src> {
         &self,
         name: &scanner::Token<'src>,
     ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
-        match self.fields.get(name.lexeme) {
-            Some(obj) => Ok(obj.clone()),
-            None => Unwinder::err(name, &format!("Undefined property '{}'.", name.lexeme)),
+        if let Some(obj) = self.fields.get(name.lexeme) {
+            Ok(obj.clone())
+        } else if let Some(obj) = self.class_.borrow().find_method(name.lexeme) {
+            Ok(obj.into())
+        } else {
+            Unwinder::err(name, &format!("Undefined property '{}'.", name.lexeme))
         }
     }
 
