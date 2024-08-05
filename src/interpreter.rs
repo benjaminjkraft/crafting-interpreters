@@ -24,7 +24,7 @@ pub struct Interpreter<'ast, 'src: 'ast, F: FnMut(String)> {
 
 fn now_sec<'ast, 'src: 'ast>() -> Result<Object<'ast, 'src>, LoxError> {
     match time::SystemTime::now().duration_since(time::UNIX_EPOCH) {
-        Ok(t) => Ok(Object::Literal(Literal::Number(t.as_secs_f64()))),
+        Ok(t) => Ok(Literal::Number(t.as_secs_f64()).into()),
         Err(e) => panic!("{e}"),
     }
 }
@@ -33,11 +33,12 @@ pub fn interpreter<'ast, 'src: 'ast>() -> Interpreter<'ast, 'src, impl FnMut(Str
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
-        Object::BuiltinFunction(BuiltinFunction {
+        BuiltinFunction {
             arity: 0,
             function: Rc::new(RefCell::new(|_| now_sec())),
             name: "clock".to_string(),
-        }),
+        }
+        .into(),
     );
     Interpreter {
         printer: |s| println!("{s}"),
@@ -193,7 +194,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             }
                             let result = self.execute_stmts(&f.declaration.body, environment);
                             let r = match result {
-                                Ok(()) => Ok(Object::Literal(Literal::Nil)), // (omitted return)
+                                Ok(()) => Ok(Literal::Nil.into()), // (omitted return)
                                 Err(Unwinder::Err(e)) => Err(Unwinder::Err(e)),
                                 Err(Unwinder::Return { keyword: _, value }) => Ok(value),
                             };
@@ -208,10 +209,11 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                                 &format!("Expected 0 arguments but got {}.", arguments.len()),
                             )
                         } else {
-                            Ok(Object::Instance(Rc::new(RefCell::new(Instance {
+                            Ok(Rc::new(RefCell::new(Instance {
                                 class_: c,
                                 fields: HashMap::new(),
-                            }))))
+                            }))
+                            .into())
                         }
                     }
                     o => Unwinder::err(
@@ -232,7 +234,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 }
             }
             Expr::Grouping(node) => self.evaluate(&node.expr),
-            Expr::Literal(node) => Ok(Object::Literal(node.value.clone())),
+            Expr::Literal(node) => Ok(node.value.clone().into()),
             Expr::Logical(node) => {
                 let left = self.evaluate(&node.left)?;
                 match (node.operator.type_, left.is_truthy()) {
@@ -303,7 +305,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             Stmt::Class(node) => {
                 self.environment
                     .borrow_mut()
-                    .define(node.name.lexeme, Object::Literal(Literal::Nil));
+                    .define(node.name.lexeme, Literal::Nil.into());
 
                 let mut methods = HashMap::new();
                 for method in &node.methods {
@@ -313,10 +315,11 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     };
                     methods.insert(method.name.lexeme.to_string(), function);
                 }
-                let class_ = Object::Class(Rc::new(RefCell::new(Class {
+                let class_ = Rc::new(RefCell::new(Class {
                     name: &node.name,
                     methods,
-                })));
+                }))
+                .into();
 
                 self.environment.borrow_mut().assign(&node.name, class_)?;
             }
@@ -326,10 +329,11 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Function(node) => {
-                let function = Object::Function(Function {
+                let function = Function {
                     declaration: node,
                     closure: self.environment.clone(),
-                });
+                }
+                .into();
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, function);
@@ -351,7 +355,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             Stmt::Return(node) => {
                 let value = match &node.value {
                     Some(expr) => self.evaluate(expr)?,
-                    None => Object::Literal(Literal::Nil),
+                    None => Literal::Nil.into(),
                 };
                 Err(Unwinder::Return {
                     keyword: &node.keyword,
@@ -361,7 +365,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             Stmt::Var(node) => {
                 let value = match &node.initializer {
                     Some(expr) => self.evaluate(expr)?,
-                    None => Object::Literal(Literal::Nil),
+                    None => Literal::Nil.into(),
                 };
 
                 self.environment
@@ -391,14 +395,15 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
         let globals = Rc::new(RefCell::new(Environment::new()));
         globals.borrow_mut().define(
             "clock",
-            Object::BuiltinFunction(BuiltinFunction {
+            BuiltinFunction {
                 arity: 0,
                 function: Rc::new(RefCell::new(move |_| {
                     time += 1.0;
                     Ok(Object::Literal(Literal::Number(time)))
                 })),
                 name: "clock".to_string(),
-            }),
+            }
+            .into(),
         );
         let mut interpreter = Interpreter {
             printer: |s| printed.push(s),
