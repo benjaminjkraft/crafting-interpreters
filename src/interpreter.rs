@@ -162,20 +162,23 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                         Self::arity_check(f.arity, arguments.len(), node)?;
                         Unwinder::promote((f.function.borrow_mut())(arguments))
                     }
-                    Object::Function(f) => self.call_function(&f, node, &arguments),
+                    Object::Function(f) => {
+                        Self::arity_check(f.declaration.parameters.len(), arguments.len(), node)?;
+                        self.call_function(&f, &arguments)
+                    }
                     Object::Class(c) => {
                         let initializer = c.borrow().find_method("init");
                         let arity = match &initializer {
                             Some(init) => init.declaration.parameters.len(),
                             None => 0,
                         };
-                        Self::arity_check(arguments.len(), arity, node)?;
+                        Self::arity_check(arity, arguments.len(), node)?;
                         let instance = Rc::new(RefCell::new(Instance {
                             class_: c,
                             fields: HashMap::new(),
                         }));
                         if let Some(init) = initializer {
-                            self.call_function(&init.bind(instance.clone()), node, &arguments)?;
+                            self.call_function(&init.bind(instance.clone()), &arguments)?;
                         }
                         Ok(instance.into())
                     }
@@ -257,11 +260,9 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
     fn call_function(
         &mut self,
         f: &Function<'ast, 'src>,
-        node: &CallExpr<'src>,
         arguments: &[Object<'ast, 'src>],
     ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
         let environment = Rc::new(RefCell::new(Environment::child(f.closure.clone())));
-        Self::arity_check(f.declaration.parameters.len(), arguments.len(), node)?;
         for (i, parameter) in f.declaration.parameters.iter().enumerate() {
             environment
                 .borrow_mut()
@@ -976,6 +977,18 @@ fn test_initializer() {
         &["1", "2", "1"],
     );
 
+    assert_errs(
+        "class C {} C(1);",
+        "[line 1] Error: Expected 0 arguments but got 1.",
+    );
+    assert_errs(
+        "class C { init() {} } C(1);",
+        "[line 1] Error: Expected 0 arguments but got 1.",
+    );
+    assert_errs(
+        "class C { init(a) { this.a = a; } } C();",
+        "[line 1] Error: Expected 1 arguments but got 0.",
+    );
     assert_errs(
         "class C { init() { return 3; } }",
         "[line 1] Error at 'return': Can't return a value from an initializer.",
