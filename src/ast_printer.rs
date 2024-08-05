@@ -47,6 +47,7 @@ fn print_expr<'src>(node: &Expr<'src>) -> String {
             node.name.lexeme,
             &print_expr(&node.value),
         ]),
+        Expr::This(_) => parenthesize(&["this"]),
         Expr::Unary(node) => parenthesize(&[node.operator.lexeme, &print_expr(&node.right)]),
         Expr::Variable(node) => parenthesize(&["variable", node.name.lexeme]),
     }

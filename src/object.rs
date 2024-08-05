@@ -75,6 +75,17 @@ pub struct Function<'ast, 'src> {
     pub closure: Rc<RefCell<Environment<'ast, 'src>>>,
 }
 
+impl<'ast, 'src> Function<'ast, 'src> {
+    fn bind(&self, instance: Rc<RefCell<Instance<'ast, 'src>>>) -> Self {
+        let mut environment = Environment::child(self.closure.clone());
+        environment.define("this", instance.into());
+        Function {
+            declaration: self.declaration,
+            closure: Rc::new(RefCell::new(environment)),
+        }
+    }
+}
+
 impl fmt::Debug for Function<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<function {}>", &self.declaration.name.lexeme)
@@ -115,20 +126,43 @@ pub struct Instance<'ast, 'src> {
     pub fields: HashMap<String, Object<'ast, 'src>>,
 }
 
-impl<'ast, 'src> Instance<'ast, 'src> {
-    pub fn get(
-        &self,
-        name: &scanner::Token<'src>,
-    ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
-        if let Some(obj) = self.fields.get(name.lexeme) {
-            Ok(obj.clone())
-        } else if let Some(obj) = self.class_.borrow().find_method(name.lexeme) {
-            Ok(obj.into())
-        } else {
-            Unwinder::err(name, &format!("Undefined property '{}'.", name.lexeme))
-        }
+fn instance_get_field<'ast, 'src>(
+    inst: &Rc<RefCell<Instance<'ast, 'src>>>,
+    name: &scanner::Token<'src>,
+) -> Option<Object<'ast, 'src>> {
+    if let Some(obj) = inst.borrow().fields.get(name.lexeme) {
+        Some(obj.clone())
+    } else {
+        None
     }
+}
 
+fn instance_get_method<'ast, 'src>(
+    inst: &Rc<RefCell<Instance<'ast, 'src>>>,
+    name: &scanner::Token<'src>,
+) -> Option<Function<'ast, 'src>> {
+    if let Some(method) = inst.borrow().class_.borrow().find_method(name.lexeme) {
+        Some(method.clone())
+    } else {
+        None
+    }
+}
+
+// TODO: possible to refactor types to make this a method?
+pub fn instance_get<'ast, 'src>(
+    inst: Rc<RefCell<Instance<'ast, 'src>>>,
+    name: &scanner::Token<'src>,
+) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
+    if let Some(obj) = instance_get_field(&inst, name) {
+        Ok(obj)
+    } else if let Some(method) = instance_get_method(&inst, name) {
+        Ok(method.bind(inst).into())
+    } else {
+        Unwinder::err(name, &format!("Undefined property '{}'.", name.lexeme))
+    }
+}
+
+impl<'ast, 'src> Instance<'ast, 'src> {
     pub fn set(&mut self, name: &scanner::Token<'src>, value: Object<'ast, 'src>) {
         self.fields.insert(name.lexeme.to_string(), value);
     }

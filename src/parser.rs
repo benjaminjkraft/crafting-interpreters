@@ -476,6 +476,12 @@ impl<'src> Parser<'src> {
                 value: Literal::String(val.to_string()),
             }
             .into())
+        } else if self.match_(&[TokenType::This]) {
+            Ok(ThisExpr {
+                keyword: self.previous(),
+                resolved_depth: None,
+            }
+            .into())
         } else if self.match_(&[TokenType::Identifier]) {
             Ok(VariableExpr {
                 name: self.previous(),
@@ -819,4 +825,9 @@ fn test_parser_fields() {
         "a.;",
         &["[line 1] Error at ';': Expect property name after '.'."],
     );
+}
+
+#[test]
+fn test_parser_this() {
+    assert_parses_to("this;", "(expr (this))");
 }

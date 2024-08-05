@@ -10,10 +10,17 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 struct Resolver<'src> {
     scopes: Vec<HashMap<&'src str, bool>>,
     errors: Vec<LoxError>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 pub fn resolve<'src>(prog: &mut Program<'src>) -> Result<(), Vec<LoxError>> {
@@ -32,6 +39,7 @@ impl<'src> Resolver<'src> {
             scopes: Vec::new(),
             errors: Vec::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -54,8 +62,17 @@ impl<'src> Resolver<'src> {
                 self.end_scope();
             }
             Stmt::Class(node) => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
+
                 self.declare(&node.name);
                 self.define(&node.name);
+
+                self.begin_scope();
+                // TODO: refactor define and use?
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.insert("this", true);
+                }
 
                 for method in &mut node.methods {
                     self.resolve_function(
@@ -64,6 +81,9 @@ impl<'src> Resolver<'src> {
                         FunctionType::Method,
                     );
                 }
+
+                self.end_scope();
+                self.current_class = enclosing_class;
             }
             Stmt::Function(node) => {
                 self.declare(&node.name);
@@ -149,6 +169,15 @@ impl<'src> Resolver<'src> {
             Expr::Assign(node) => {
                 self.resolve_expr(&mut node.value);
                 self.resolve_local(&mut node.resolved_depth, &node.name);
+            }
+            Expr::This(node) => {
+                if self.current_class == ClassType::None {
+                    self.errors.push(parse_error(
+                        &node.keyword,
+                        "Can't use 'this' outside of a class.",
+                    ));
+                }
+                self.resolve_local(&mut node.resolved_depth, &node.keyword);
             }
 
             // Just walk

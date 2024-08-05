@@ -17,6 +17,7 @@ pub enum Expr<'src> {
     Literal(LiteralExpr),
     Logical(LogicalExpr<'src>),
     Set(SetExpr<'src>),
+    This(ThisExpr<'src>),
     Unary(UnaryExpr<'src>),
     Variable(VariableExpr<'src>),
 }
@@ -83,6 +84,12 @@ pub struct SetExpr<'src> {
     pub object: Box<Expr<'src>>,
     pub name: scanner::Token<'src>,
     pub value: Box<Expr<'src>>,
+}
+
+#[derive(Debug)]
+pub struct ThisExpr<'src> {
+    pub keyword: scanner::Token<'src>,
+    pub resolved_depth: Option<usize>,
 }
 
 #[derive(Debug)]

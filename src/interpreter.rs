@@ -1,12 +1,11 @@
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
-use crate::object::{BuiltinFunction, Class, Function, Instance, Literal, Object};
+use crate::object::{instance_get, BuiltinFunction, Class, Function, Instance, Literal, Object};
 #[cfg(test)]
 use crate::parser;
 #[cfg(test)]
 use crate::resolver;
-#[cfg(test)]
 use crate::scanner;
 use crate::scanner::TokenType;
 use crate::unwind::Unwinder;
@@ -225,7 +224,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             Expr::Get(node) => {
                 let object = self.evaluate(&node.object)?;
                 if let Object::Instance(obj) = object {
-                    obj.borrow().get(&node.name)
+                    instance_get(obj, &node.name)
                 } else {
                     Unwinder::err(
                         &node.name,
@@ -256,6 +255,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     )
                 }
             }
+            Expr::This(node) => self.lookup_variable(&node.resolved_depth, &node.keyword),
             Expr::Unary(node) => {
                 let right = self.evaluate(&node.right)?;
 
@@ -270,10 +270,18 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
                 }
             }
-            Expr::Variable(node) => match node.resolved_depth {
-                Some(depth) => self.environment.borrow().get_at(depth, &node.name),
-                None => self.globals.borrow().get(&node.name),
-            },
+            Expr::Variable(node) => self.lookup_variable(&node.resolved_depth, &node.name),
+        }
+    }
+
+    fn lookup_variable(
+        &self,
+        resolved_depth: &Option<usize>,
+        name: &scanner::Token<'src>,
+    ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
+        match resolved_depth {
+            Some(depth) => self.environment.borrow().get_at(*depth, name),
+            None => self.globals.borrow().get(name),
         }
     }
 
@@ -815,5 +823,108 @@ fn test_methods() {
             print i.f();
         "#,
         "[line 5] Error: Undefined property 'f'.",
+    );
+}
+
+#[test]
+fn test_this() {
+    assert_prints(
+        r#"
+            class C {
+                f() { print this.v; return this.r; }
+                g() { print this.f(); }
+                s() { i.v = "v2"; i.r = "r2"; }
+            }
+            var i = C();
+            i.v = "v";
+            i.r = "r";
+            print i.f();
+            print i.g();
+            i.s();
+            print i.f();
+            print i.g();
+            var f = i.f;
+            var g = i.g;
+            print f();
+            print g();
+        "#,
+        &[
+            "v", "r", "v", "r", "nil", "v2", "r2", "v2", "r2", "nil", "v2", "r2", "v2", "r2", "nil",
+        ],
+    );
+
+    assert_prints(
+        r#"
+            class Cake {
+                taste() {
+                    var adjective = "delicious";
+                    print "The " + this.flavor + " cake is " + adjective + "!";
+                }
+            }
+
+            var cake = Cake();
+            cake.flavor = "German chocolate";
+            cake.taste();
+        "#,
+        &["The German chocolate cake is delicious!"],
+    );
+    assert_prints(
+        r#"
+            class Egotist {
+                speak() {
+                    print this;
+                }
+            }
+
+            var method = Egotist().speak;
+            method();
+            "#,
+        &["<instance of Egotist>"],
+    );
+
+    assert_prints(
+        r#"
+            class C {
+                f() {
+                    fun g() {
+                        return this;
+                    }
+                    return g;
+                }
+            }
+            var i = C();
+            print i == i.f()();
+        "#,
+        &["true"],
+    );
+    assert_prints(
+        r#"
+            class Outer {
+                f() {
+                    class Inner {
+                        g() {
+                            return this;
+                        }
+                    }
+                    var i = Inner();
+                    i.outer = this;
+                    return i;
+                }
+            }
+            var o = Outer();
+            var i = o.f();
+            print i == i.g();
+            print o == i.outer;
+        "#,
+        &["true", "true"],
+    );
+
+    assert_errs(
+        "print this;",
+        "[line 1] Error at 'this': Can't use 'this' outside of a class.",
+    );
+    assert_errs(
+        "fun f() { print this; }",
+        "[line 1] Error at 'this': Can't use 'this' outside of a class.",
     );
 }
