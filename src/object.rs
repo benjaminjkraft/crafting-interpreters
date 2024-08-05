@@ -42,32 +42,47 @@ impl Literal {
 #[derive(Debug, Clone)]
 pub enum Object<'ast, 'src: 'ast> {
     Literal(Literal),
-    BuiltinFunction(Function<'ast, 'src>),
-    Function {
-        declaration: &'ast ast::FunctionStmt<'src>,
-        closure: Rc<RefCell<Environment<'ast, 'src>>>,
-    },
+    BuiltinFunction(BuiltinFunction<'ast, 'src>),
+    Function(Function<'ast, 'src>),
     Class(Rc<RefCell<Class<'ast, 'src>>>),
     Instance(Rc<RefCell<Instance<'ast, 'src>>>),
 }
 
 #[derive(Clone)]
-pub struct Function<'ast, 'src> {
+pub struct BuiltinFunction<'ast, 'src> {
     pub arity: usize,
     pub function:
         Rc<RefCell<dyn FnMut(Vec<Object<'ast, 'src>>) -> Result<Object<'ast, 'src>, LoxError>>>,
     pub name: String,
 }
 
-impl fmt::Debug for Function<'_, '_> {
+impl fmt::Debug for BuiltinFunction<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<function {} (arity {})>", &self.name, &self.arity)
     }
 }
 
-impl fmt::Display for Function<'_, '_> {
+impl fmt::Display for BuiltinFunction<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<function {}>", &self.name)
+    }
+}
+
+#[derive(Clone)]
+pub struct Function<'ast, 'src> {
+    pub declaration: &'ast ast::FunctionStmt<'src>,
+    pub closure: Rc<RefCell<Environment<'ast, 'src>>>,
+}
+
+impl fmt::Debug for Function<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<function {}>", &self.declaration.name.lexeme)
+    }
+}
+
+impl fmt::Display for Function<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<function {}>", &self.declaration.name.lexeme)
     }
 }
 
@@ -115,9 +130,7 @@ impl<'ast, 'src: 'ast> fmt::Display for Object<'ast, 'src> {
         match self {
             Object::Literal(v) => write!(f, "{v}"),
             Object::BuiltinFunction(v) => v.fmt(f),
-            Object::Function { declaration, .. } => {
-                write!(f, "<function {}>", declaration.name.lexeme)
-            }
+            Object::Function(v) => v.fmt(f),
             Object::Class(c) => c.borrow().fmt(f),
             Object::Instance(i) => i.borrow().fmt(f),
         }
@@ -143,9 +156,7 @@ impl<'ast, 'src: 'ast> PartialEq for Object<'ast, 'src> {
                 l.arity == r.arity && Rc::ptr_eq(&l.function, &r.function) && l.name == r.name
             }
             (Object::BuiltinFunction(_), _) | (_, Object::BuiltinFunction(_)) => false,
-            (Object::Function { declaration: l, .. }, Object::Function { declaration: r, .. }) => {
-                ptr::eq(*l, *r)
-            }
+            (Object::Function(l), Object::Function(r)) => ptr::eq(l.declaration, r.declaration),
             (Object::Function { .. }, _) | (_, Object::Function { .. }) => false,
             (Object::Class(l), Object::Class(r)) => Rc::ptr_eq(l, r),
             (Object::Class(_), _) | (_, Object::Class(_)) => false,

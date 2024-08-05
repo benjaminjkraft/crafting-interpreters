@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::{runtime_error, LoxError};
-use crate::object::{Class, Function, Instance, Literal, Object};
+use crate::object::{BuiltinFunction, Class, Function, Instance, Literal, Object};
 #[cfg(test)]
 use crate::parser;
 #[cfg(test)]
@@ -33,7 +33,7 @@ pub fn interpreter<'ast, 'src: 'ast>() -> Interpreter<'ast, 'src, impl FnMut(Str
     let globals = Rc::new(RefCell::new(Environment::new()));
     globals.borrow_mut().define(
         "clock",
-        Object::BuiltinFunction(Function {
+        Object::BuiltinFunction(BuiltinFunction {
             arity: 0,
             function: Rc::new(RefCell::new(|_| now_sec())),
             name: "clock".to_string(),
@@ -172,29 +172,26 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             Unwinder::promote((f.function.borrow_mut())(arguments))
                         }
                     }
-                    Object::Function {
-                        declaration,
-                        closure,
-                    } => {
+                    Object::Function(f) => {
                         let environment =
-                            Rc::new(RefCell::new(Environment::child(closure.clone())));
-                        if declaration.parameters.len() != arguments.len() {
+                            Rc::new(RefCell::new(Environment::child(f.closure.clone())));
+                        if f.declaration.parameters.len() != arguments.len() {
                             // TODO: duplicated a bit
                             Unwinder::err(
                                 &node.paren,
                                 &format!(
                                     "Expected {} arguments but got {}.",
-                                    declaration.parameters.len(),
+                                    f.declaration.parameters.len(),
                                     arguments.len()
                                 ),
                             )
                         } else {
-                            for (i, parameter) in declaration.parameters.iter().enumerate() {
+                            for (i, parameter) in f.declaration.parameters.iter().enumerate() {
                                 environment
                                     .borrow_mut()
                                     .define(parameter.lexeme, arguments[i].clone());
                             }
-                            let result = self.execute_stmts(&declaration.body, environment);
+                            let result = self.execute_stmts(&f.declaration.body, environment);
                             let r = match result {
                                 Ok(()) => Ok(Object::Literal(Literal::Nil)), // (omitted return)
                                 Err(Unwinder::Err(e)) => Err(Unwinder::Err(e)),
@@ -319,10 +316,10 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Function(node) => {
-                let function = Object::Function {
+                let function = Object::Function(Function {
                     declaration: node,
                     closure: self.environment.clone(),
-                };
+                });
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, function);
@@ -384,7 +381,7 @@ pub fn execute_for_tests(source: &str) -> Result<Vec<String>, LoxError> {
         let globals = Rc::new(RefCell::new(Environment::new()));
         globals.borrow_mut().define(
             "clock",
-            Object::BuiltinFunction(Function {
+            Object::BuiltinFunction(BuiltinFunction {
                 arity: 0,
                 function: Rc::new(RefCell::new(move |_| {
                     time += 1.0;
