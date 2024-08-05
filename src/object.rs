@@ -73,15 +73,17 @@ impl fmt::Display for BuiltinFunction<'_, '_> {
 pub struct Function<'ast, 'src> {
     pub declaration: &'ast ast::FunctionStmt<'src>,
     pub closure: Rc<RefCell<Environment<'ast, 'src>>>,
+    pub is_initializer: bool,
 }
 
 impl<'ast, 'src> Function<'ast, 'src> {
-    fn bind(&self, instance: Rc<RefCell<Instance<'ast, 'src>>>) -> Self {
+    pub fn bind(&self, instance: Rc<RefCell<Instance<'ast, 'src>>>) -> Self {
         let mut environment = Environment::child(self.closure.clone());
         environment.define("this", instance.into());
         Function {
             declaration: self.declaration,
             closure: Rc::new(RefCell::new(environment)),
+            is_initializer: self.is_initializer,
         }
     }
 }
@@ -105,7 +107,7 @@ pub struct Class<'ast, 'src> {
 }
 
 impl<'ast, 'src> Class<'ast, 'src> {
-    fn find_method(&self, name: &str) -> Option<Function<'ast, 'src>> {
+    pub fn find_method(&self, name: &str) -> Option<Function<'ast, 'src>> {
         if let Some(method) = self.methods.get(name) {
             Some(method.clone())
         } else {

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -78,7 +79,11 @@ impl<'src> Resolver<'src> {
                     self.resolve_function(
                         &method.parameters,
                         &mut method.body,
-                        FunctionType::Method,
+                        if method.name.lexeme == "init" {
+                            FunctionType::Initializer
+                        } else {
+                            FunctionType::Method
+                        },
                     );
                 }
 
@@ -99,6 +104,12 @@ impl<'src> Resolver<'src> {
                     ));
                 }
                 if let Some(ref mut value) = &mut node.value {
+                    if self.current_function == FunctionType::Initializer {
+                        self.errors.push(parse_error(
+                            &node.keyword,
+                            "Can't return a value from an initializer.",
+                        ));
+                    }
                     self.resolve_expr(value);
                 }
             }

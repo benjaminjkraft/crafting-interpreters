@@ -172,47 +172,28 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                             Unwinder::promote((f.function.borrow_mut())(arguments))
                         }
                     }
-                    Object::Function(f) => {
-                        let environment =
-                            Rc::new(RefCell::new(Environment::child(f.closure.clone())));
-                        if f.declaration.parameters.len() != arguments.len() {
-                            // TODO: duplicated a bit
-                            Unwinder::err(
-                                &node.paren,
-                                &format!(
-                                    "Expected {} arguments but got {}.",
-                                    f.declaration.parameters.len(),
-                                    arguments.len()
-                                ),
-                            )
-                        } else {
-                            for (i, parameter) in f.declaration.parameters.iter().enumerate() {
-                                environment
-                                    .borrow_mut()
-                                    .define(parameter.lexeme, arguments[i].clone());
-                            }
-                            let result = self.execute_stmts(&f.declaration.body, environment);
-                            let r = match result {
-                                Ok(()) => Ok(Literal::Nil.into()), // (omitted return)
-                                Err(Unwinder::Err(e)) => Err(Unwinder::Err(e)),
-                                Err(Unwinder::Return { keyword: _, value }) => Ok(value),
-                            };
-                            r
-                        }
-                    }
+                    Object::Function(f) => self.call_function(f, &node, &arguments),
                     Object::Class(c) => {
-                        if arguments.len() != 0 {
+                        let initializer = c.borrow().find_method("init");
+                        let arity = match &initializer {
+                            Some(init) => init.declaration.parameters.len(),
+                            None => 0,
+                        };
+                        if arguments.len() != arity {
                             // TODO: duplicated a bit
                             Unwinder::err(
                                 &node.paren,
-                                &format!("Expected 0 arguments but got {}.", arguments.len()),
+                                &format!("Expected {arity} arguments but got {}.", arguments.len()),
                             )
                         } else {
-                            Ok(Rc::new(RefCell::new(Instance {
+                            let instance = Rc::new(RefCell::new(Instance {
                                 class_: c,
                                 fields: HashMap::new(),
-                            }))
-                            .into())
+                            }));
+                            if let Some(init) = initializer {
+                                self.call_function(init.bind(instance.clone()), &node, &arguments)?;
+                            }
+                            Ok(instance.into())
                         }
                     }
                     o => Unwinder::err(
@@ -274,6 +255,44 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         }
     }
 
+    fn call_function(
+        &mut self,
+        f: Function<'ast, 'src>,
+        node: &CallExpr<'src>,
+        arguments: &Vec<Object<'ast, 'src>>,
+    ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
+        let environment = Rc::new(RefCell::new(Environment::child(f.closure.clone())));
+        if f.declaration.parameters.len() != arguments.len() {
+            // TODO: duplicated a bit
+            Unwinder::err(
+                &node.paren,
+                &format!(
+                    "Expected {} arguments but got {}.",
+                    f.declaration.parameters.len(),
+                    arguments.len()
+                ),
+            )
+        } else {
+            for (i, parameter) in f.declaration.parameters.iter().enumerate() {
+                environment
+                    .borrow_mut()
+                    .define(parameter.lexeme, arguments[i].clone());
+            }
+            let result = self.execute_stmts(&f.declaration.body, environment.clone());
+            match (result, f.is_initializer) {
+                (Ok(()), true) | (Err(Unwinder::Return { .. }), true) => {
+                    // In initializer, all returns (but not exceptions) are really 'this'.
+                    let mut fake_token = f.declaration.name.clone();
+                    fake_token.lexeme = "this";
+                    environment.borrow().get_at(0, &fake_token)
+                }
+                (Err(Unwinder::Err(e)), _) => Err(Unwinder::Err(e)),
+                (Ok(()), _) => Ok(Literal::Nil.into()), // (omitted return)
+                (Err(Unwinder::Return { keyword: _, value }), _) => Ok(value),
+            }
+        }
+    }
+
     fn lookup_variable(
         &self,
         resolved_depth: &Option<usize>,
@@ -320,6 +339,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     let function = Function {
                         declaration: method,
                         closure: self.environment.clone(),
+                        is_initializer: method.name.lexeme == "init",
                     };
                     methods.insert(method.name.lexeme.to_string(), function);
                 }
@@ -340,6 +360,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 let function = Function {
                     declaration: node,
                     closure: self.environment.clone(),
+                    is_initializer: false,
                 }
                 .into();
                 self.environment
@@ -926,5 +947,49 @@ fn test_this() {
     assert_errs(
         "fun f() { print this; }",
         "[line 1] Error at 'this': Can't use 'this' outside of a class.",
+    );
+}
+
+#[test]
+fn test_initializer() {
+    assert_prints(
+        r#"
+            class C {
+                init(a, b) {
+                    this.a = a;
+                    this.b = b;
+                }
+            }
+            var i = C(1, 2);
+            print i.a;
+            print i.b;
+            print i.init(3, 4);
+            print i.a;
+            print i.b;
+        "#,
+        &["1", "2", "<instance of C>", "3", "4"],
+    );
+    assert_prints(
+        r#"
+            class C {
+                init(a, b) {
+                    this.a = a;
+                    if (b == nil) {
+                        return;
+                    }
+                    print b;
+                }
+            }
+            var i1 = C(1, nil);
+            print i1.a;
+            var i2 = C(1, 2);
+            print i2.a;
+        "#,
+        &["1", "2", "1"],
+    );
+
+    assert_errs(
+        "class C { init() { return 3; } }",
+        "[line 1] Error at 'return': Can't return a value from an initializer.",
     );
 }
