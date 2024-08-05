@@ -105,7 +105,7 @@ pub struct BlockStmt<'src> {
 #[derive(Debug)]
 pub struct ClassStmt<'src> {
     pub name: scanner::Token<'src>,
-    pub methods: Vec<Stmt<'src>>,
+    pub methods: Vec<FunctionStmt<'src>>,
 }
 
 #[derive(Debug)]

@@ -304,10 +304,14 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Class(node) => {
-                let class_ = Object::Class(Rc::new(RefCell::new(Class { name: &node.name })));
                 self.environment
                     .borrow_mut()
-                    .define(node.name.lexeme, class_);
+                    .define(node.name.lexeme, Object::Literal(Literal::Nil));
+
+                // let methods = HashMap::new();
+                let class_ = Object::Class(Rc::new(RefCell::new(Class { name: &node.name })));
+
+                self.environment.borrow_mut().assign(&node.name, class_)?;
             }
 
             Stmt::Expr(node) => {

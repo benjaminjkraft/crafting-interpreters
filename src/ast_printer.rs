@@ -61,19 +61,34 @@ fn print_block<'src>(head: &str, stmts: &Vec<Stmt<'src>>) -> String {
     format!("({head}\n{body})")
 }
 
+// TODO(benkraft): ick! how to avoid?
+#[cfg(test)]
+fn print_function_block<'src>(head: &str, stmts: &Vec<FunctionStmt<'src>>) -> String {
+    let body = stmts
+        .iter()
+        .map(|stmt| format!("\t{}\n", print_function(stmt)))
+        .join("");
+    format!("({head}\n{body})")
+}
+
+#[cfg(test)]
+fn print_function<'src>(node: &FunctionStmt<'src>) -> String {
+    let mut parts = vec!["fun", node.name.lexeme];
+    parts.extend(node.parameters.iter().map(|param| param.lexeme));
+    let body = print_block("", &node.body);
+    parts.push(&body);
+    parenthesize(parts)
+}
+
 #[cfg(test)]
 fn print_stmt<'src>(node: &Stmt<'src>) -> String {
     match node {
         Stmt::Block(node) => print_block("block", &node.stmts),
-        Stmt::Class(node) => print_block(&format!("class {}", node.name.lexeme), &node.methods),
-        Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
-        Stmt::Function(node) => {
-            let mut parts = vec!["fun", node.name.lexeme];
-            parts.extend(node.parameters.iter().map(|param| param.lexeme));
-            let body = print_block("", &node.body);
-            parts.push(&body);
-            parenthesize(parts)
+        Stmt::Class(node) => {
+            print_function_block(&format!("class {}", node.name.lexeme), &node.methods)
         }
+        Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
+        Stmt::Function(node) => print_function(&node),
         Stmt::If(node) => {
             let mut parts = vec![
                 "if".to_string(),

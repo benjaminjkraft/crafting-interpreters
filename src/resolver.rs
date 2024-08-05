@@ -7,6 +7,7 @@ use std::collections::HashMap;
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 struct Resolver<'src> {
@@ -55,6 +56,14 @@ impl<'src> Resolver<'src> {
             Stmt::Class(node) => {
                 self.declare(&node.name);
                 self.define(&node.name);
+
+                for method in &mut node.methods {
+                    self.resolve_function(
+                        &method.parameters,
+                        &mut method.body,
+                        FunctionType::Method,
+                    );
+                }
             }
             Stmt::Function(node) => {
                 self.declare(&node.name);

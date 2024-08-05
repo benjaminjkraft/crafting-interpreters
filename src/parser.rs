@@ -55,7 +55,7 @@ impl<'src> Parser<'src> {
         } else if self.match_(&[TokenType::Class]) {
             self.class_declaration()
         } else if self.match_(&[TokenType::Fun]) {
-            self.function("function")
+            Ok(self.function("function")?.into())
         } else {
             self.statement()
         }
@@ -239,7 +239,7 @@ impl<'src> Parser<'src> {
         .into())
     }
 
-    fn function(&mut self, kind: &str) -> Result<Stmt<'src>, LoxError> {
+    fn function(&mut self, kind: &str) -> Result<FunctionStmt<'src>, LoxError> {
         let name = self.consume(TokenType::Identifier, &format!("Expect {kind} name."))?;
         self.consume(
             TokenType::LeftParen,
@@ -273,8 +273,7 @@ impl<'src> Parser<'src> {
             name,
             parameters,
             body,
-        }
-        .into())
+        })
     }
 
     fn expression(&mut self) -> Result<Expr<'src>, LoxError> {
@@ -802,6 +801,10 @@ fn test_parser_class() {
     assert_parse_error(
         "class C { + }",
         &["[line 1] Error at '+': Expect method name."],
+    );
+    assert_parse_error(
+        "class C { print 1 }",
+        &["[line 1] Error at 'print': Expect method name."],
     );
 }
 
