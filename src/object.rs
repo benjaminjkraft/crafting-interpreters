@@ -2,7 +2,9 @@ use crate::ast;
 use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::scanner;
+use crate::unwind::Unwinder;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::ptr;
 use std::rc::Rc;
@@ -83,6 +85,23 @@ impl fmt::Display for Class<'_, '_> {
 #[derive(Debug)]
 pub struct Instance<'ast, 'src> {
     pub class_: Rc<RefCell<Class<'ast, 'src>>>,
+    pub fields: HashMap<String, Object<'ast, 'src>>,
+}
+
+impl<'ast, 'src> Instance<'ast, 'src> {
+    pub fn get(
+        &self,
+        name: &scanner::Token<'src>,
+    ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
+        match self.fields.get(name.lexeme) {
+            Some(obj) => Ok(obj.clone()),
+            None => Unwinder::err(name, &format!("Undefined property '{}'.", name.lexeme)),
+        }
+    }
+
+    pub fn set(&mut self, name: &scanner::Token<'src>, value: Object<'ast, 'src>) {
+        self.fields.insert(name.lexeme.to_string(), value);
+    }
 }
 
 impl fmt::Display for Instance<'_, '_> {

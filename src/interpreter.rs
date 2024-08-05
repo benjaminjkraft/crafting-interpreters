@@ -11,6 +11,7 @@ use crate::scanner;
 use crate::scanner::TokenType;
 use crate::unwind::Unwinder;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time;
 
@@ -212,6 +213,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                         } else {
                             Ok(Object::Instance(Rc::new(RefCell::new(Instance {
                                 class_: c,
+                                fields: HashMap::new(),
                             }))))
                         }
                     }
@@ -219,6 +221,17 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                         &node.paren,
                         &format!("Can only call functions and classes, got '{o}'."),
                     ),
+                }
+            }
+            Expr::Get(node) => {
+                let object = self.evaluate(&node.object)?;
+                if let Object::Instance(obj) = object {
+                    obj.borrow().get(&node.name)
+                } else {
+                    Unwinder::err(
+                        &node.name,
+                        &format!("Only instances have properties, got '{object}'."),
+                    )
                 }
             }
             Expr::Grouping(node) => self.evaluate(&node.expr),
@@ -229,6 +242,19 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     (TokenType::Or, true) | (TokenType::And, false) => Ok(left),
                     (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(&node.right),
                     _ => Unwinder::err(&node.operator, "unknown operator (parser bug?)"),
+                }
+            }
+            Expr::Set(node) => {
+                let object = self.evaluate(&node.object)?;
+                if let Object::Instance(obj) = object {
+                    let value = self.evaluate(&node.value)?;
+                    obj.borrow_mut().set(&node.name, value.clone());
+                    Ok(value)
+                } else {
+                    Unwinder::err(
+                        &node.name,
+                        &format!("Only instances have fields, got '{object}'."),
+                    )
                 }
             }
             Expr::Unary(node) => {
@@ -725,5 +751,27 @@ fn test_class() {
     assert_prints(
         "class C {} var i = C(); var j = C(); print i == j;",
         &["false"],
+    );
+}
+
+#[test]
+fn test_fields() {
+    assert_prints("class C {} var i = C(); i.f = 1; print i.f;", &["1"]);
+    assert_prints(
+        "class C {} var i = C(); i.f = 1; i.f = i.f + 1; print i.f;",
+        &["2"],
+    );
+
+    assert_errs(
+        "var a = 1; a.f = 1;",
+        "[line 1] Error: Only instances have fields, got '1'.",
+    );
+    assert_errs(
+        "var a = 1; print a.f;",
+        "[line 1] Error: Only instances have properties, got '1'.",
+    );
+    assert_errs(
+        "class C {} var i = C(); print i.f;",
+        "[line 1] Error: Undefined property 'f'.",
     );
 }

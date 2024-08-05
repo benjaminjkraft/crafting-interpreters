@@ -153,6 +153,9 @@ impl<'src> Resolver<'src> {
                     self.resolve_expr(argument);
                 }
             }
+            Expr::Get(node) => {
+                self.resolve_expr(&mut node.object);
+            }
             Expr::Grouping(node) => {
                 self.resolve_expr(&mut node.expr);
             }
@@ -160,6 +163,10 @@ impl<'src> Resolver<'src> {
             Expr::Logical(node) => {
                 self.resolve_expr(&mut node.left);
                 self.resolve_expr(&mut node.right);
+            }
+            Expr::Set(node) => {
+                self.resolve_expr(&mut node.object);
+                self.resolve_expr(&mut node.value);
             }
             Expr::Unary(node) => {
                 self.resolve_expr(&mut node.right);

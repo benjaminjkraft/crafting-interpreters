@@ -33,12 +33,19 @@ fn print_expr<'src>(node: &Expr<'src>) -> String {
             }
             parenthesize(&parts)
         }
+        Expr::Get(node) => parenthesize(&["get", &print_expr(&node.object), node.name.lexeme]),
         Expr::Grouping(node) => parenthesize(&["group", &print_expr(&node.expr)]),
         Expr::Literal(node) => parenthesize(&[&node.value.to_string()]),
         Expr::Logical(node) => parenthesize(&[
             node.operator.lexeme,
             &print_expr(&node.left),
             &print_expr(&node.right),
+        ]),
+        Expr::Set(node) => parenthesize(&[
+            "set",
+            &print_expr(&node.object),
+            node.name.lexeme,
+            &print_expr(&node.value),
         ]),
         Expr::Unary(node) => parenthesize(&[node.operator.lexeme, &print_expr(&node.right)]),
         Expr::Variable(node) => parenthesize(&["variable", node.name.lexeme]),

@@ -304,20 +304,23 @@ impl<'src> Parser<'src> {
     fn assignment(&mut self) -> Result<Expr<'src>, LoxError> {
         let expr = self.or()?;
         if self.match_(&[TokenType::Equal]) {
-            let var = match expr {
-                Expr::Variable(v) => Ok(v),
-                _ => Err(error::parse_error(
-                    &self.previous(),
-                    "Invalid assignment target.",
-                )),
-            }?;
+            let equals = self.previous();
             let value = self.assignment()?;
-            Ok(AssignExpr {
-                name: var.name,
-                value: Box::new(value),
-                resolved_depth: None,
+            match expr {
+                Expr::Variable(var) => Ok(AssignExpr {
+                    name: var.name,
+                    value: Box::new(value),
+                    resolved_depth: None,
+                }
+                .into()),
+                Expr::Get(get) => Ok(SetExpr {
+                    object: get.object,
+                    name: get.name,
+                    value: Box::new(value),
+                }
+                .into()),
+                _ => Err(error::parse_error(&equals, "Invalid assignment target.")),
             }
-            .into())
         } else {
             Ok(expr)
         }
@@ -403,6 +406,14 @@ impl<'src> Parser<'src> {
         loop {
             if self.match_(&[TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_(&[TokenType::Dot]) {
+                let name =
+                    self.consume(TokenType::Identifier, "Expect property name after '.'.")?;
+                expr = GetExpr {
+                    object: Box::new(expr),
+                    name,
+                }
+                .into();
             } else {
                 break;
             }
@@ -601,7 +612,10 @@ fn test_parser_literals() {
     assert_parses_to("1;", "(expr (1))");
     assert_parses_to("1.0;", "(expr (1))");
     assert_parses_to("12.345;", "(expr (12.345))");
-    assert_parse_error("1.;", &["[line 1] Error at '.': Expect ';' after value."]);
+    assert_parse_error(
+        "1.;",
+        &["[line 1] Error at ';': Expect property name after '.'."],
+    );
     assert_parses_to("\"asdf!!\";", "(expr (asdf!!))");
 }
 
@@ -622,6 +636,11 @@ fn test_parser_vars() {
     assert_parses_to(
         "var v; var w; v = w = 3;",
         "(var v)\n(var w)\n(expr (assign v (assign w (3))))",
+    );
+
+    assert_parse_error(
+        "1 = 1",
+        &["[line 1] Error at '=': Invalid assignment target."],
     );
 }
 
@@ -783,5 +802,18 @@ fn test_parser_class() {
     assert_parse_error(
         "class C { + }",
         &["[line 1] Error at '+': Expect method name."],
+    );
+}
+
+#[test]
+fn test_parser_fields() {
+    assert_parses_to("a.b;", "(expr (get (variable a) b))");
+    assert_parses_to("a.b.c;", "(expr (get (get (variable a) b) c))");
+    assert_parses_to("a.b = 1;", "(expr (set (variable a) b (1)))");
+    assert_parses_to("a.b.c = 1;", "(expr (set (get (variable a) b) c (1)))");
+
+    assert_parse_error(
+        "a.;",
+        &["[line 1] Error at ';': Expect property name after '.'."],
     );
 }

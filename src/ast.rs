@@ -12,9 +12,11 @@ pub enum Expr<'src> {
     Assign(AssignExpr<'src>),
     Binary(BinaryExpr<'src>),
     Call(CallExpr<'src>),
+    Get(GetExpr<'src>),
     Grouping(GroupingExpr<'src>),
     Literal(LiteralExpr),
     Logical(LogicalExpr<'src>),
+    Set(SetExpr<'src>),
     Unary(UnaryExpr<'src>),
     Variable(VariableExpr<'src>),
 }
@@ -54,6 +56,12 @@ pub struct CallExpr<'src> {
 }
 
 #[derive(Debug)]
+pub struct GetExpr<'src> {
+    pub object: Box<Expr<'src>>,
+    pub name: scanner::Token<'src>,
+}
+
+#[derive(Debug)]
 pub struct GroupingExpr<'src> {
     pub expr: Box<Expr<'src>>,
 }
@@ -68,6 +76,13 @@ pub struct LogicalExpr<'src> {
     pub left: Box<Expr<'src>>,
     pub operator: scanner::Token<'src>,
     pub right: Box<Expr<'src>>,
+}
+
+#[derive(Debug)]
+pub struct SetExpr<'src> {
+    pub object: Box<Expr<'src>>,
+    pub name: scanner::Token<'src>,
+    pub value: Box<Expr<'src>>,
 }
 
 #[derive(Debug)]
