@@ -159,42 +159,25 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
 
                 match callee {
                     Object::BuiltinFunction(f) => {
-                        if f.arity != arguments.len() {
-                            Unwinder::err(
-                                &node.paren,
-                                &format!(
-                                    "Expected {} arguments but got {}.",
-                                    f.arity,
-                                    arguments.len()
-                                ),
-                            )
-                        } else {
-                            Unwinder::promote((f.function.borrow_mut())(arguments))
-                        }
+                        self.arity_check(f.arity, arguments.len(), node)?;
+                        Unwinder::promote((f.function.borrow_mut())(arguments))
                     }
-                    Object::Function(f) => self.call_function(f, &node, &arguments),
+                    Object::Function(f) => self.call_function(f, node, &arguments),
                     Object::Class(c) => {
                         let initializer = c.borrow().find_method("init");
                         let arity = match &initializer {
                             Some(init) => init.declaration.parameters.len(),
                             None => 0,
                         };
-                        if arguments.len() != arity {
-                            // TODO: duplicated a bit
-                            Unwinder::err(
-                                &node.paren,
-                                &format!("Expected {arity} arguments but got {}.", arguments.len()),
-                            )
-                        } else {
-                            let instance = Rc::new(RefCell::new(Instance {
-                                class_: c,
-                                fields: HashMap::new(),
-                            }));
-                            if let Some(init) = initializer {
-                                self.call_function(init.bind(instance.clone()), &node, &arguments)?;
-                            }
-                            Ok(instance.into())
+                        self.arity_check(arguments.len(), arity, node)?;
+                        let instance = Rc::new(RefCell::new(Instance {
+                            class_: c,
+                            fields: HashMap::new(),
+                        }));
+                        if let Some(init) = initializer {
+                            self.call_function(init.bind(instance.clone()), node, &arguments)?;
                         }
+                        Ok(instance.into())
                     }
                     o => Unwinder::err(
                         &node.paren,
@@ -255,6 +238,23 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         }
     }
 
+    fn arity_check(
+        &self,
+        expected: usize,
+        actual: usize,
+        node: &CallExpr<'src>,
+    ) -> Result<(), Unwinder<'ast, 'src>> {
+        if expected != actual {
+            Unwinder::err(
+                &node.paren,
+                &format!("Expected {expected} arguments but got {actual}.",),
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    // TODO: getting pretty awk here
     fn call_function(
         &mut self,
         f: Function<'ast, 'src>,
@@ -262,34 +262,23 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
         arguments: &Vec<Object<'ast, 'src>>,
     ) -> Result<Object<'ast, 'src>, Unwinder<'ast, 'src>> {
         let environment = Rc::new(RefCell::new(Environment::child(f.closure.clone())));
-        if f.declaration.parameters.len() != arguments.len() {
-            // TODO: duplicated a bit
-            Unwinder::err(
-                &node.paren,
-                &format!(
-                    "Expected {} arguments but got {}.",
-                    f.declaration.parameters.len(),
-                    arguments.len()
-                ),
-            )
-        } else {
-            for (i, parameter) in f.declaration.parameters.iter().enumerate() {
-                environment
-                    .borrow_mut()
-                    .define(parameter.lexeme, arguments[i].clone());
+        self.arity_check(f.declaration.parameters.len(), arguments.len(), node)?;
+        for (i, parameter) in f.declaration.parameters.iter().enumerate() {
+            environment
+                .borrow_mut()
+                .define(parameter.lexeme, arguments[i].clone());
+        }
+        let result = self.execute_stmts(&f.declaration.body, environment.clone());
+        match (result, f.is_initializer) {
+            (Ok(()), true) | (Err(Unwinder::Return { .. }), true) => {
+                // In initializer, all returns (but not exceptions) are really 'this'.
+                let mut fake_token = f.declaration.name.clone();
+                fake_token.lexeme = "this";
+                environment.borrow().get_at(0, &fake_token)
             }
-            let result = self.execute_stmts(&f.declaration.body, environment.clone());
-            match (result, f.is_initializer) {
-                (Ok(()), true) | (Err(Unwinder::Return { .. }), true) => {
-                    // In initializer, all returns (but not exceptions) are really 'this'.
-                    let mut fake_token = f.declaration.name.clone();
-                    fake_token.lexeme = "this";
-                    environment.borrow().get_at(0, &fake_token)
-                }
-                (Err(Unwinder::Err(e)), _) => Err(Unwinder::Err(e)),
-                (Ok(()), _) => Ok(Literal::Nil.into()), // (omitted return)
-                (Err(Unwinder::Return { keyword: _, value }), _) => Ok(value),
-            }
+            (Err(Unwinder::Err(e)), _) => Err(Unwinder::Err(e)),
+            (Ok(()), _) => Ok(Literal::Nil.into()), // (omitted return)
+            (Err(Unwinder::Return { keyword: _, value }), _) => Ok(value),
         }
     }
 
