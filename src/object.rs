@@ -108,11 +108,7 @@ pub struct Class<'ast, 'src> {
 
 impl<'ast, 'src> Class<'ast, 'src> {
     pub fn find_method(&self, name: &str) -> Option<Function<'ast, 'src>> {
-        if let Some(method) = self.methods.get(name) {
-            Some(method.clone())
-        } else {
-            None
-        }
+        self.methods.get(name).cloned()
     }
 }
 
@@ -132,22 +128,14 @@ fn instance_get_field<'ast, 'src>(
     inst: &Rc<RefCell<Instance<'ast, 'src>>>,
     name: &scanner::Token<'src>,
 ) -> Option<Object<'ast, 'src>> {
-    if let Some(obj) = inst.borrow().fields.get(name.lexeme) {
-        Some(obj.clone())
-    } else {
-        None
-    }
+    inst.borrow().fields.get(name.lexeme).cloned()
 }
 
 fn instance_get_method<'ast, 'src>(
     inst: &Rc<RefCell<Instance<'ast, 'src>>>,
     name: &scanner::Token<'src>,
 ) -> Option<Function<'ast, 'src>> {
-    if let Some(method) = inst.borrow().class_.borrow().find_method(name.lexeme) {
-        Some(method.clone())
-    } else {
-        None
-    }
+    inst.borrow().class_.borrow().find_method(name.lexeme)
 }
 
 // TODO: possible to refactor types to make this a method?
