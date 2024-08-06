@@ -69,6 +69,15 @@ impl<'src> Resolver<'src> {
                 self.declare(&node.name);
                 self.define(&node.name);
 
+                if let Some(ref mut sup) = &mut node.superclass {
+                    if sup.name.lexeme == node.name.lexeme {
+                        self.errors
+                            .push(parse_error(&sup.name, "A class can't inherit from itself."));
+                    } else {
+                        self.resolve_variable(sup);
+                    }
+                }
+
                 self.begin_scope();
                 // TODO: refactor define and use?
                 if let Some(scope) = self.scopes.last_mut() {
@@ -162,20 +171,24 @@ impl<'src> Resolver<'src> {
         self.current_function = enclosing_function;
     }
 
+    fn resolve_variable(&mut self, node: &mut VariableExpr<'src>) {
+        if let Some(scope) = self.scopes.last() {
+            if scope.get(node.name.lexeme) == Some(&false) {
+                self.errors.push(parse_error(
+                    &node.name,
+                    "Can't read local variable in its own initializer.",
+                ));
+            }
+        }
+
+        self.resolve_local(&mut node.resolved_depth, &node.name);
+    }
+
     fn resolve_expr(&mut self, expr: &mut Expr<'src>) {
         match expr {
             // Interesting expressions
             Expr::Variable(node) => {
-                if let Some(scope) = self.scopes.last() {
-                    if scope.get(node.name.lexeme) == Some(&false) {
-                        self.errors.push(parse_error(
-                            &node.name,
-                            "Can't read local variable in its own initializer.",
-                        ));
-                    }
-                }
-
-                self.resolve_local(&mut node.resolved_depth, &node.name);
+                self.resolve_variable(node);
             }
             Expr::Assign(node) => {
                 self.resolve_expr(&mut node.value);

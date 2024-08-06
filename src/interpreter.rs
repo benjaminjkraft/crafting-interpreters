@@ -319,6 +319,19 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
             }
 
             Stmt::Class(node) => {
+                let superclass = if let Some(sup) = &node.superclass {
+                    let resolved = self.lookup_variable(&sup.resolved_depth, &sup.name)?;
+                    match resolved {
+                        Object::Class(c) => Ok(Some(c)),
+                        _ => Unwinder::err(
+                            &sup.name,
+                            &format!("Superclass must be a class (was '{resolved}')."),
+                        ),
+                    }
+                } else {
+                    Ok(None)
+                }?;
+
                 self.environment
                     .borrow_mut()
                     .define(node.name.lexeme, Literal::Nil.into());
@@ -334,6 +347,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 }
                 let class_ = Rc::new(RefCell::new(Class {
                     name: &node.name,
+                    superclass,
                     methods,
                 }))
                 .into();
@@ -992,5 +1006,61 @@ fn test_initializer() {
     assert_errs(
         "class C { init() { return 3; } }",
         "[line 1] Error at 'return': Can't return a value from an initializer.",
+    );
+}
+
+#[test]
+fn test_inheritance() {
+    assert_prints(
+        r#"
+            class C {
+                init(a) { this.a = a; }
+                p() { print this.a; }
+            }
+            class D < C {}
+            var i = D(1);
+            i.p();
+        "#,
+        &["1"],
+    );
+    assert_prints(
+        r#"
+            class C {
+                init(a) { this.a = a; }
+                p() { print this.a; }
+            }
+            class D < C {
+                init(a) { this.a = a + 1; }
+            }
+            var i = D(1);
+            i.p();
+        "#,
+        &["2"],
+    );
+    assert_prints(
+        r#"
+            class C {
+                init(a) { this.a = a; }
+                p() { print this.a; }
+            }
+            class D < C {
+                init(a) { this.a = a + 1; }
+            }
+            class E < D {
+                p() { print this.a * 3; }
+            }
+            var i = E(1);
+            i.p();
+        "#,
+        &["6"],
+    );
+
+    assert_errs(
+        "class C < C {}",
+        "[line 1] Error at 'C': A class can't inherit from itself.",
+    );
+    assert_errs(
+        "var D = 3; class C < D {}",
+        "[line 1] Error: Superclass must be a class (was '3').",
     );
 }

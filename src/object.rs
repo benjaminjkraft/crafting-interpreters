@@ -103,12 +103,19 @@ impl fmt::Display for Function<'_, '_> {
 #[derive(Debug)]
 pub struct Class<'ast, 'src> {
     pub name: &'ast scanner::Token<'src>,
+    pub superclass: Option<Rc<RefCell<Class<'ast, 'src>>>>,
     pub methods: HashMap<String, Function<'ast, 'src>>,
 }
 
 impl<'ast, 'src> Class<'ast, 'src> {
     pub fn find_method(&self, name: &str) -> Option<Function<'ast, 'src>> {
-        self.methods.get(name).cloned()
+        if let Some(method) = self.methods.get(name) {
+            Some(method.clone())
+        } else if let Some(sup) = &self.superclass {
+            sup.borrow().find_method(name)
+        } else {
+            None
+        }
     }
 }
 

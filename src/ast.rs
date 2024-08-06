@@ -112,6 +112,7 @@ pub struct BlockStmt<'src> {
 #[derive(Debug)]
 pub struct ClassStmt<'src> {
     pub name: scanner::Token<'src>,
+    pub superclass: Option<Box<VariableExpr<'src>>>,
     pub methods: Vec<FunctionStmt<'src>>,
 }
 

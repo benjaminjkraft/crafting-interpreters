@@ -63,13 +63,28 @@ impl<'src> Parser<'src> {
 
     fn class_declaration(&mut self) -> Result<Stmt<'src>, LoxError> {
         let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+        let superclass = if self.match_(&[TokenType::Less]) {
+            self.consume(TokenType::Identifier, "Expect superclass name.")?;
+            Some(Box::new(VariableExpr {
+                name: self.previous(),
+                resolved_depth: None,
+            }))
+        } else {
+            None
+        };
+
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.")?;
         let mut methods = Vec::new();
         while !self.is_at_end() && !self.check(TokenType::RightBrace) {
             methods.push(self.function("method")?);
         }
         self.consume(TokenType::RightBrace, "Expect '}' after class body.")?;
-        Ok(ClassStmt { name, methods }.into())
+        Ok(ClassStmt {
+            name,
+            superclass,
+            methods,
+        }
+        .into())
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'src>, LoxError> {
@@ -830,4 +845,14 @@ fn test_parser_fields() {
 #[test]
 fn test_parser_this() {
     assert_parses_to("this;", "(expr (this))");
+}
+
+#[test]
+fn test_parser_superclass() {
+    assert_parses_to("class Sub < Super {}", "(class Sub < Super\n)");
+
+    assert_parse_error(
+        "class Sub < {}",
+        &["[line 1] Error at '{': Expect superclass name."],
+    );
 }

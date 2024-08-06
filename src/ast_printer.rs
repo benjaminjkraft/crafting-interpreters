@@ -86,7 +86,12 @@ fn print_stmt<'src>(node: &Stmt<'src>) -> String {
     match node {
         Stmt::Block(node) => print_block("block", &node.stmts),
         Stmt::Class(node) => {
-            print_function_block(&format!("class {}", node.name.lexeme), &node.methods)
+            let mut head = format!("class {}", node.name.lexeme);
+            if let Some(e) = &node.superclass {
+                head = format!("{head} < {}", e.name.lexeme);
+            }
+
+            print_function_block(&head, &node.methods)
         }
         Stmt::Expr(node) => parenthesize(&["expr", &print_expr(&node.expr)]),
         Stmt::Function(node) => print_function(&node),
