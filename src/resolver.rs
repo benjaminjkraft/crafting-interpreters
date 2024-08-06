@@ -80,7 +80,7 @@ impl<'src> Resolver<'src> {
                     }
                 }
 
-                if let Some(_) = &node.superclass {
+                if node.superclass.is_some() {
                     self.begin_scope();
                     if let Some(scope) = self.scopes.last_mut() {
                         scope.insert("super", true);
@@ -107,7 +107,7 @@ impl<'src> Resolver<'src> {
 
                 self.end_scope();
 
-                if let Some(_) = &node.superclass {
+                if node.superclass.is_some() {
                     self.end_scope();
                 }
 

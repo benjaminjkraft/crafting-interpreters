@@ -393,7 +393,7 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 }))
                 .into();
 
-                if let Some(_) = superclass.clone() {
+                if superclass.clone().is_some() {
                     self.environment = enclosing_environment;
                 }
 
