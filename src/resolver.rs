@@ -15,6 +15,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 struct Resolver<'src> {
@@ -70,11 +71,19 @@ impl<'src> Resolver<'src> {
                 self.define(&node.name);
 
                 if let Some(ref mut sup) = &mut node.superclass {
+                    self.current_class = ClassType::Subclass;
                     if sup.name.lexeme == node.name.lexeme {
                         self.errors
                             .push(parse_error(&sup.name, "A class can't inherit from itself."));
                     } else {
                         self.resolve_variable(sup);
+                    }
+                }
+
+                if let Some(_) = &node.superclass {
+                    self.begin_scope();
+                    if let Some(scope) = self.scopes.last_mut() {
+                        scope.insert("super", true);
                     }
                 }
 
@@ -97,6 +106,11 @@ impl<'src> Resolver<'src> {
                 }
 
                 self.end_scope();
+
+                if let Some(_) = &node.superclass {
+                    self.end_scope();
+                }
+
                 self.current_class = enclosing_class;
             }
             Stmt::Function(node) => {
@@ -193,6 +207,20 @@ impl<'src> Resolver<'src> {
             Expr::Assign(node) => {
                 self.resolve_expr(&mut node.value);
                 self.resolve_local(&mut node.resolved_depth, &node.name);
+            }
+            Expr::Super(node) => {
+                match self.current_class {
+                    ClassType::None => self.errors.push(parse_error(
+                        &node.keyword,
+                        "Can't use 'super' outside of a class.",
+                    )),
+                    ClassType::Class => self.errors.push(parse_error(
+                        &node.keyword,
+                        "Can't use 'super' in a class with no superclass.",
+                    )),
+                    ClassType::Subclass => {}
+                }
+                self.resolve_local(&mut node.resolved_depth, &node.keyword);
             }
             Expr::This(node) => {
                 if self.current_class == ClassType::None {

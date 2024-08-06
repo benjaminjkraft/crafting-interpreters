@@ -222,6 +222,37 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     )
                 }
             }
+            Expr::Super(node) => {
+                let depth = node.resolved_depth.ok_or(Unwinder::Err(runtime_error(
+                    &node.keyword,
+                    "no super found (resolver bug?)",
+                )))?;
+
+                let superclass = self.environment.borrow().get_at(depth, &node.keyword)?;
+                let Object::Class(sup) = superclass else {
+                    return Unwinder::err(
+                        &node.keyword,
+                        "super was not a class (interpreter bug?)",
+                    );
+                };
+                // TODO: eugh
+                let mut fake_token = node.keyword.clone();
+                fake_token.lexeme = "this";
+                let object = self.environment.borrow().get_at(depth - 1, &fake_token)?;
+                let Object::Instance(obj) = object else {
+                    return Unwinder::err(
+                        &node.keyword,
+                        "this was not an instance (interpreter bug?)",
+                    );
+                };
+                let Some(method) = sup.borrow().find_method(node.method.lexeme) else {
+                    return Unwinder::err(
+                        &node.keyword,
+                        &format!("Undefined property '{}'.", node.method.lexeme),
+                    );
+                };
+                return Ok(method.bind(obj).into());
+            }
             Expr::This(node) => self.lookup_variable(&node.resolved_depth, &node.keyword),
             Expr::Unary(node) => {
                 let right = self.evaluate(&node.right)?;
@@ -336,6 +367,16 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                     .borrow_mut()
                     .define(node.name.lexeme, Literal::Nil.into());
 
+                let enclosing_environment = self.environment.clone();
+                if let Some(sup) = superclass.clone() {
+                    let sup_environment =
+                        Rc::new(RefCell::new(Environment::child(self.environment.clone())));
+                    self.environment = sup_environment;
+                    self.environment
+                        .borrow_mut()
+                        .define("super", Object::Class(sup));
+                };
+
                 let mut methods = HashMap::new();
                 for method in &node.methods {
                     let function = Function {
@@ -347,10 +388,14 @@ impl<'ast, 'src: 'ast, F: FnMut(String)> Interpreter<'ast, 'src, F> {
                 }
                 let class_ = Rc::new(RefCell::new(Class {
                     name: &node.name,
-                    superclass,
+                    superclass: superclass.clone(),
                     methods,
                 }))
                 .into();
+
+                if let Some(_) = superclass.clone() {
+                    self.environment = enclosing_environment;
+                }
 
                 self.environment.borrow_mut().assign(&node.name, class_)?;
             }
@@ -1062,5 +1107,51 @@ fn test_inheritance() {
     assert_errs(
         "var D = 3; class C < D {}",
         "[line 1] Error: Superclass must be a class (was '3').",
+    );
+}
+
+#[test]
+fn test_super() {
+    assert_prints(
+        r#"
+            class C {
+                init(a) { this.a = a; }
+                p() { print this.a; }
+            }
+            class D < C {
+                init(a, b) { super.init(a); this.b = b; }
+                p() { super.p(); print this.b; }
+            }
+            class E < D {}
+            E(1, 2).p();
+        "#,
+        &["1", "2"],
+    );
+    assert_prints(
+        r#"
+            class A {
+                method() { print "A method"; }
+            }
+            class B < A {
+                method() { print "B method"; }
+                test() { super.method(); }
+            }
+            class C < B {}
+            C().test();
+        "#,
+        &["A method"],
+    );
+
+    assert_errs(
+        "class C { m() { super.m(); } } C().m();",
+        "[line 1] Error at 'super': Can't use 'super' in a class with no superclass.",
+    );
+    assert_errs(
+        "fun m() { super.m(); } m();",
+        "[line 1] Error at 'super': Can't use 'super' outside of a class.",
+    );
+    assert_errs(
+        "class C {} class D < C { m() { super.m(); } } D().m();",
+        "[line 1] Error: Undefined property 'm'.",
     );
 }

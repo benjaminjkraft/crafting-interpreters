@@ -491,6 +491,16 @@ impl<'src> Parser<'src> {
                 value: Literal::String(val.to_string()),
             }
             .into())
+        } else if self.match_(&[TokenType::Super]) {
+            let keyword = self.previous();
+            self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
+            let method = self.consume(TokenType::Identifier, "Expect superclass method name.")?;
+            Ok(SuperExpr {
+                keyword,
+                method,
+                resolved_depth: None,
+            }
+            .into())
         } else if self.match_(&[TokenType::This]) {
             Ok(ThisExpr {
                 keyword: self.previous(),
@@ -850,9 +860,28 @@ fn test_parser_this() {
 #[test]
 fn test_parser_superclass() {
     assert_parses_to("class Sub < Super {}", "(class Sub < Super\n)");
+    assert_parses_to(
+        "class Sub < Super { init() { super.init(); } }",
+        "(class Sub < Super\n\t(fun init (\n\t(expr (call (super init)))\n))\n)",
+    );
 
     assert_parse_error(
         "class Sub < {}",
         &["[line 1] Error at '{': Expect superclass name."],
+    );
+    assert_parse_error(
+        "class Sub < Super { init() { super; } }",
+        &[
+            "[line 1] Error at ';': Expect '.' after 'super'.",
+            // TODO: synchronize is pretty sketchy, man
+            "[line 1] Error at '}': Expect expression.",
+        ],
+    );
+    assert_parse_error(
+        "class Sub < Super { init() { super.1; } }",
+        &[
+            "[line 1] Error at '1': Expect superclass method name.",
+            "[line 1] Error at '}': Expect expression.",
+        ],
     );
 }
